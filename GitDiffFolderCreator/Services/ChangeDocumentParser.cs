@@ -79,14 +79,11 @@ namespace GitDiffFolderCreator.Services
     /// </remarks>
     public static class ChangeDocumentParser
     {
-        /// <summary>
-        /// The heading that opens the list, for a document that does not name its own.
-        /// </summary>
+        /// <summary>The heading that opens the list, for a document that does not name its own.</summary>
         /// <remarks>
-        /// The brackets are part of how the heading is written rather than part of what it says: the
-        /// comparison strips them from both sides, so <c>Modified Files</c> and <c>[Modified Files]:</c>
-        /// open the same section. They are written here because that is how the documents this was written
-        /// against spell it, so the default reads the same as the document does.
+        /// Written with the brackets because that is how the documents this was written against spell it.
+        /// A document that writes <c>Modified Files</c> instead is a different heading as far as this is
+        /// concerned, and naming it is one edit in the settings rather than a rule guessed at here.
         /// </remarks>
         public const string DefaultStartMarker = "[Modified Files]";
 
@@ -204,38 +201,26 @@ namespace GitDiffFolderCreator.Services
         /// <remarks>
         /// Nothing is taken off it except the whitespace around it — not the brackets, not a colon, not
         /// any other character somebody deliberately put there. A marker is a setting a reader typed and
-        /// expects to find again unchanged, and rewriting it behind their back is how a marker ends up
-        /// naming something other than what they wrote.
-        /// <para>
-        /// Alongside it is a second form, <em>derived</em> rather than edited, with the brackets and colons
-        /// an author may put around a heading taken off the ends. Matching tries the typed text against
-        /// the line first and only falls back to that, so the default <c>[Modified Files]</c> still finds
-        /// a document that writes <c>Modified Files</c> — without the setting itself being changed to do
-        /// it, and without a marker of nothing but brackets quietly becoming no marker at all.
-        /// </para>
+        /// expects to find again unchanged, and there is no second reading of it to fall back on: a
+        /// document that writes <c>Modified Files</c> is not the same heading as one that writes
+        /// <c>[Modified Files]</c>, and the setting says which one this document has.
         /// </remarks>
         private sealed class Heading
         {
-            private Heading(string exact, string unbracketed)
+            private Heading(string exact)
             {
                 Exact = exact;
-                Unbracketed = unbracketed;
             }
 
             /// <summary>The marker as typed, less the whitespace around it.</summary>
             public string Exact { get; }
-
-            /// <summary>The same heading with the brackets and colons taken off both ends.</summary>
-            public string Unbracketed { get; }
 
             /// <summary>The marker, or null when there is nothing to look for.</summary>
             public static Heading? From(string? marker)
             {
                 string exact = (marker ?? string.Empty).Trim();
 
-                return exact.Length == 0
-                    ? null
-                    : new Heading(exact, exact.Trim('[', ']', ':', ' ').Trim());
+                return exact.Length == 0 ? null : new Heading(exact);
             }
 
             /// <summary>
@@ -246,32 +231,13 @@ namespace GitDiffFolderCreator.Services
             /// Files section lists…" — a sentence that happens to contain the words — from opening the
             /// section in the wrong place. What follows it is not compared: an author who writes
             /// <c>[Status] - all green</c> has written the heading, and requiring the line to end there
-            /// would read their document as having no section in it.
+            /// would read their document as having no section in it. Case is ignored, because a heading is
+            /// not a name.
             /// </remarks>
             public bool Matches(string? line)
             {
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    return false;
-                }
-
-                string typed = line!.Trim();
-
-                if (StartsWith(typed, Exact))
-                {
-                    return true;
-                }
-
-                // Only for the fallback, and only off the front: a trailing bracket belongs to whatever
-                // the author wrote after the heading.
-                string bare = typed.TrimStart('[', ']', ':', ' ').Trim();
-
-                return StartsWith(bare, Unbracketed);
-            }
-
-            private static bool StartsWith(string text, string prefix)
-            {
-                return prefix.Length > 0 && text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+                return !string.IsNullOrWhiteSpace(line)
+                    && line!.Trim().StartsWith(Exact, StringComparison.OrdinalIgnoreCase);
             }
         }
 

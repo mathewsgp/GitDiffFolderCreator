@@ -307,10 +307,9 @@ The list is read from one section, bounded by two headings:
  Passed
 ```
 
-With the default markers, the headings may be written `[Modified Files]` or plain `Modified Files`, with
-or without the colon. Everything between `[Modified Files]` and `[Status]` is read as the list;
-everything outside it is ignored, so the "Root cause" and "Fix" paragraphs — and any example list
-earlier in the document — cannot turn into findings.
+With the default markers the headings are `[Modified Files]` and `[Status]`. Everything between them is
+read as the list; everything outside it is ignored, so the "Root cause" and "Fix" paragraphs — and any
+example list earlier in the document — cannot turn into findings.
 
 ### If your document names its sections differently
 
@@ -329,9 +328,10 @@ be at the *start* of the line, so `[Status] - all green` and `[Modified Files] (
 recognised while "the Modified Files section below lists…" is still not a heading. **Defaults** puts both
 back.
 
-One exception, in your favour: the default `[Modified Files]` also finds a document that writes the same
-heading as `Modified Files`. That second spelling is worked out from your marker rather than by editing
-it, so a marker that genuinely needs its brackets is still matched with them.
+One thing to know before you type: a heading is matched as written, not as a spelling. A document that
+writes `Modified Files` — no brackets — is a different heading from `[Modified Files]`, so it needs the
+marker set to `Modified Files`. There is no second reading of a marker to catch both, because a marker
+that matches two different headings cannot say which section it meant.
 
 **The section may appear more than once.** Every section the two markers bound is read, so a document
 written as one list per module or per phase is checked in full rather than only in its first part.

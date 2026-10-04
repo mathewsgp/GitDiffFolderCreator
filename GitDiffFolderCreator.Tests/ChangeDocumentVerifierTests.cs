@@ -406,7 +406,7 @@ public sealed class ChangeDocumentVerifierTests
     /// </summary>
     private static ChangeVerificationResult Verify(Fixture fixture, params string[] listed)
     {
-        IList<string> paragraphs = new[] { "Modified files:" }
+        IList<string> paragraphs = new[] { ChangeDocumentParser.DefaultStartMarker }
             .Concat(listed.Select(path => Bullet + " " + path))
             .ToList();
 

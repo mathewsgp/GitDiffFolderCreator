@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Windows;
@@ -146,7 +146,7 @@ public sealed class ChangeDocumentReaderTests
     }
 
     /// <summary>
-    /// The same list with no numbering, and two paths on one line.
+/// The same list with no numbering, and two paths on one line.
     /// </summary>
     /// <remarks>
     /// A line is not one path. A gap of a tab or of two or more spaces separates two paths, which is how
@@ -157,7 +157,7 @@ public sealed class ChangeDocumentReaderTests
     {
         IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
         {
-            "Modified Files",
+            "[Modified Files]",
             "      \\Src\\Module1\\View2\\Source\\View2\\Frames\\2222.xaml.cs",
             "      \\Src\\Module1\\View2\\Source\\View2\\Frames\\24dsds.xaml.cs       \\Src\\Module1\\View2\\Source\\View2\\Frames\\xdsf.xaml.cs",
             "      \\Src\\Infrastructure\\32fws\\wrwe.cs",
@@ -519,7 +519,7 @@ public sealed class ChangeDocumentReaderTests
         ChangeDocumentViewModel model = New();
         model.BaseFolder = baseFolder;
         model.ModifiedFolder = Path.Combine(root.Path, "nowhere");
-        model.DocumentPath = TempDocx.Create(root.PathFor("changes.docx"), new[] { "Modified files:" });
+        model.DocumentPath = TempDocx.Create(root.PathFor("changes.docx"), new[] { "[Modified Files]" });
 
         await model.VerifyAsync();
 
@@ -540,7 +540,7 @@ public sealed class ChangeDocumentReaderTests
         model.ModifiedFolder = modifiedFolder;
         model.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
-            new[] { "Modified files:", Bullet + " src/Edited.cs" });
+            new[] { "[Modified Files]", Bullet + " src/Edited.cs" });
 
         await model.VerifyAsync();
 
@@ -570,7 +570,7 @@ public sealed class ChangeDocumentReaderTests
         model.ModifiedFolder = modifiedFolder;
         model.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
-            new[] { "Modified files:", Bullet + " src/Untouched.cs" });
+            new[] { "[Modified Files]", Bullet + " src/Untouched.cs" });
 
         await model.VerifyAsync();
 
@@ -604,7 +604,7 @@ public sealed class ChangeDocumentReaderTests
         ignoring.ModifiedFolder = modifiedFolder;
         ignoring.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
-            new[] { "Modified files:", Bullet + " src/Edited.cs" });
+            new[] { "[Modified Files]", Bullet + " src/Edited.cs" });
 
         Assert.True(ignoring.IgnoreBuildOutput);
 
@@ -622,7 +622,7 @@ public sealed class ChangeDocumentReaderTests
         keeping.IgnoreBuildOutput = false;
         keeping.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
-            new[] { "Modified files:", Bullet + " src/Edited.cs" });
+            new[] { "[Modified Files]", Bullet + " src/Edited.cs" });
 
         await keeping.VerifyAsync();
 
@@ -766,7 +766,7 @@ public sealed class ChangeDocumentReaderTests
         model.ModifiedFolder = modifiedFolder;
         model.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
-            new[] { "Modified files:", Bullet + " src/Edited.cs" });
+            new[] { "[Modified Files]", Bullet + " src/Edited.cs" });
 
         var announced = new List<bool>();
         model.CopyReportCommand.CanExecuteChanged += (_, _) => announced.Add(model.CanReport);
@@ -796,7 +796,7 @@ public sealed class ChangeDocumentReaderTests
         model.ModifiedFolder = modifiedFolder;
         model.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
-            new[] { "Modified files:", Bullet + " src/Edited.cs" });
+            new[] { "[Modified Files]", Bullet + " src/Edited.cs" });
 
         await model.VerifyAsync();
         Assert.True(model.CanReport);

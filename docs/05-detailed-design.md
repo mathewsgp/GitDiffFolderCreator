@@ -728,10 +728,10 @@ two-column row into two lines.
 
 **Finding the paths.** The document is read as what it is — a document with a section in it — rather
 than as prose to be mined for anything path-shaped. Two headings bound the list: everything between
-the start heading and the end heading is the list, and everything outside it is not. The headings are
-compared as whole lines with the brackets and a trailing colon stripped, so `[Modified Files]`,
-`[Modified Files]:` and `Modified Files` are the same heading while *"the Modified Files section
-below lists…"* is a sentence that happens to contain one.
+the start heading and the end heading is the list, and everything outside it is not. Each heading is
+matched at the start of a line with whatever follows it ignored, so `[Status] - all green` is the
+`[Status]` heading while *"the Modified Files section below lists…"* is a sentence that happens to
+contain one.
 
 **Which two headings is a setting, not a constant.** They default to `[Modified Files]` and `[Status]`,
 but they come from the settings file and are editable in the checker window, because change documents
@@ -743,12 +743,11 @@ kind that only the reader can rule out.
 Two decisions make the setting usable rather than a spelling test:
 
 - **the typed marker is what is compared, and nothing is taken off it but the whitespace around it.**
-  Every character in a marker is there on purpose, and rewriting it behind the reader's back is how a
-  marker ends up naming something other than what they wrote — trimming `[`, `]` and `:` off the ends
-  made a marker of nothing but brackets name no heading at all. The tolerance is kept as a *derived*
-  second form: matching tries the marker as typed against the line, and only falls back to the same
-  heading with the brackets and colons taken off the ends. So the default `[Modified Files]` still finds
-  a document that writes `Modified Files`, and the setting itself is never edited to do it;
+  Every character in a marker is there on purpose, and there is no second reading of it: trimming
+  `[`, `]` and `:` off the ends made a marker of nothing but brackets name no heading at all, and
+  matching a bracketed marker against an unbracketed heading meant one setting could name two different
+  sections. A document that writes `Modified Files` is a different heading from `[Modified Files]` and is
+  named by setting the marker to it — one edit, rather than a rule guessed at on every line;
 - **the heading only has to be at the start of the line**, and nothing after it is compared. An author
   who writes `[Status] - all green` has written the heading, and requiring the line to end at the marker
   would read the document as having no section — which is reported as agreement, so the tool would pass a

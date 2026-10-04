@@ -164,19 +164,19 @@ public sealed class ChangeDocumentMarkerTests
     }
 
     /// <summary>
-    /// A marker matches however the heading brackets and cases it.
+    /// A marker matches the heading as typed, whatever the case and whatever follows it.
     /// </summary>
     /// <remarks>
-    /// The marker is typed once, in settings, and the document is typed by hand every time it is written,
-    /// so the two will not agree on the brackets, the trailing colon or the capital letters. Requiring an
-    /// exact match would make the setting a spelling test rather than a pointer to a heading.
+    /// Two things are deliberately not compared. Case, because a heading is not a name and nobody wants
+    /// to be told off for a capital letter. And whatever comes after it, because an author who writes
+    /// <c>[Status] - all green</c> has written the heading and a count, not failed to.
     /// </remarks>
     [Theory]
     [InlineData("[Files Changed]", "[files changed]")]
     [InlineData("[Files Changed]", "[Files Changed]:")]
-    [InlineData("Files Changed", "  [Files Changed]  ")]
-    [InlineData("FILES CHANGED", "[Files Changed]")]
-    public void A_marker_matches_the_heading_however_it_brackets_and_cases_it(string marker, string heading)
+    [InlineData("[Files Changed]", "  [Files Changed] - 3 files  ")]
+    [InlineData("[FILES CHANGED]", "[Files Changed]")]
+    public void A_marker_matches_the_heading_as_typed(string marker, string heading)
     {
         IList<DocumentedFile> documented = ChangeDocumentParser.Parse(
             new[] { heading, Bullet + " src/Parser.cs", "[Status]", "Passed" },
@@ -184,6 +184,35 @@ public sealed class ChangeDocumentMarkerTests
             endMarker: "[Status]");
 
         Assert.Equal(new[] { "src/Parser.cs" }, documented.Select(file => file.Path));
+    }
+
+    /// <summary>
+    /// A heading written without the brackets is not the bracketed one, and is not found by it.
+    /// </summary>
+    /// <remarks>
+    /// This is the other half of using a marker as typed: with no second reading of it to fall back on,
+    /// a document that writes <c>Modified Files</c> under a <c>[Modified Files]</c> marker holds no list
+    /// at all. That is a real cost, and it is the right one — the alternative is a marker that matches two
+    /// different headings and so cannot say which section it meant. Naming it is one edit in the settings.
+    /// </remarks>
+    [Fact]
+    public void A_heading_written_without_the_brackets_is_not_the_bracketed_one()
+    {
+        Assert.Empty(ChangeDocumentParser.Parse(new[]
+        {
+            "Modified Files:",
+            Bullet + " src/Parser.cs",
+            "Status",
+            "Passed",
+        }));
+
+        // Said once more with the markers set to what this document actually writes, which is the answer.
+        IList<DocumentedFile> named = ChangeDocumentParser.Parse(
+            new[] { "Modified Files:", Bullet + " src/Parser.cs", "Status", "Passed" },
+            startMarker: "Modified Files",
+            endMarker: "Status");
+
+        Assert.Equal("src/Parser.cs", Assert.Single(named).Path);
     }
 
     [Fact]
@@ -199,8 +228,8 @@ public sealed class ChangeDocumentMarkerTests
             startMarker: "Files Changed",
             endMarker: "[Status]");
 
-        // The rule the defaults were written under holds for a configured marker too: the whole line is
-        // compared, so a sentence that happens to contain the words is not the heading.
+        // The rule the defaults were written under holds for a configured marker too: the heading has to
+        // start the line, so a sentence that happens to contain the words is not the heading.
         Assert.Empty(documented);
     }
 
@@ -237,7 +266,7 @@ public sealed class ChangeDocumentMarkerTests
     }
 
     /// <summary>
-    /// The typed marker is what is compared, before anything is taken off either side.
+    /// The typed marker is what is compared, before anything is taken off it.
     /// </summary>
     /// <remarks>
     /// The brackets here are part of the heading rather than decoration around it — this document does
@@ -257,28 +286,6 @@ public sealed class ChangeDocumentMarkerTests
             },
             startMarker: "[Src] Modified Files",
             endMarker: "[Status]");
-
-        Assert.Equal("src/Parser.cs", Assert.Single(documented).Path);
-    }
-
-    /// <summary>
-    /// The default bracketed marker still finds the same heading written without them.
-    /// </summary>
-    /// <remarks>
-    /// Which is the reason the derived form exists at all: <c>[Modified Files]</c> is the default, and
-    /// plenty of documents write <c>Modified Files</c>. That tolerance is a second form computed from
-    /// the marker, never a change to the marker.
-    /// </remarks>
-    [Fact]
-    public void The_default_marker_still_finds_the_heading_written_without_brackets()
-    {
-        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
-        {
-            "Modified Files:",
-            Bullet + " src/Parser.cs",
-            "Status",
-            "Passed",
-        });
 
         Assert.Equal("src/Parser.cs", Assert.Single(documented).Path);
     }
