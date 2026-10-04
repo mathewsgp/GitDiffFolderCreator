@@ -224,12 +224,20 @@ namespace GitDiffFolderCreator.Services
 
             int matches = 0;
             var matched = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var matchedLines = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var seenInDocument = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Where each real file was first claimed, per section. Keyed by section because a document may
+            // repeat the list - one section per module - and the same file in two of them is that
+            // document's normal way of writing itself, not an error. Only two claims inside one section
+            // are the same claim made twice.
+            var matchedIn = new Dictionary<string, Dictionary<int, int>>(StringComparer.OrdinalIgnoreCase);
+
+            // The same, for claims that name nothing: two sections may each list a file that is in neither
+            // source, and neither of them is a finding about the other.
+            var claimedIn = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (DocumentedFile file in documented)
             {
-                if (seenInDocument.Contains(file.Path))
+                if (!ClaimedInSection(claimedIn, file))
                 {
                     findings.Add(new ChangeFinding(
                         ChangeFindingKind.ListedTwice,
@@ -241,8 +249,6 @@ namespace GitDiffFolderCreator.Services
                     continue;
                 }
 
-                seenInDocument.Add(file.Path);
-
                 // The claim as the document spells it. The comparison reads it from the right, so a
                 // document that wrote the path from part way down still names the file - what it got
                 // wrong at the front is dropped once the file is found.
@@ -250,8 +256,10 @@ namespace GitDiffFolderCreator.Services
 
                 if (key != null)
                 {
-                    if (matchedLines.TryGetValue(key, out int firstLine))
+                    if (FirstLineIn(matchedIn, key, file.Section) is int firstLine)
                     {
+                        // Two spellings of one file inside one section: the document contradicts itself
+                        // about where the file is.
                         findings.Add(new ChangeFinding(
                             ChangeFindingKind.ListedTwice,
                             file.Path,
@@ -259,12 +267,15 @@ namespace GitDiffFolderCreator.Services
                             "This line and line "
                                 + firstLine.ToString(CultureInfo.InvariantCulture)
                                 + " both name the same file, " + key + "."));
+
+                        continue;
                     }
-                    else
+
+                    // A file already accounted for in an earlier section is left alone rather than
+                    // counted again: it is one change, and one move, however many sections name it.
+                    if (!matched.Contains(key))
                     {
                         matched.Add(key);
-                        matchedLines[key] = file.LineNumber;
-
                         matches++;
 
                         if (movedFrom.TryGetValue(key, out FolderMove? move))
@@ -292,6 +303,14 @@ namespace GitDiffFolderCreator.Services
                                     + otherWay.FromPath + "."));
                         }
                     }
+
+                    if (!matchedIn.TryGetValue(key, out Dictionary<int, int>? bySection))
+                    {
+                        bySection = new Dictionary<int, int>();
+                        matchedIn[key] = bySection;
+                    }
+
+                    bySection[file.Section] = file.LineNumber;
                 }
                 else if (!IsAccountedFor(matched, changed, movedTo, file))
                 {
@@ -323,6 +342,40 @@ namespace GitDiffFolderCreator.Services
                 comparison.FilesCompared,
                 comparison.FilesIgnored,
                 matches);
+        }
+
+        /// <summary>
+        /// Whether this claim names something this section has already named, and records that it has.
+        /// </summary>
+        /// <remarks>
+        /// Scoped to the section on purpose. Two lists of the same file in two sections is a document
+        /// written as one list per module, and reporting it would fill the findings with a complaint
+        /// about a document that is entirely correct. Two of them in one section is a duplicated entry,
+        /// which is worth saying.
+        /// </remarks>
+        private static bool ClaimedInSection(
+            Dictionary<string, HashSet<int>> claimedIn,
+            DocumentedFile file)
+        {
+            if (!claimedIn.TryGetValue(file.Path, out HashSet<int>? sections))
+            {
+                sections = new HashSet<int>();
+                claimedIn[file.Path] = sections;
+            }
+
+            return sections.Add(file.Section);
+        }
+
+        /// <summary>The line this section first named the file on, or null if it has not named it yet.</summary>
+        private static int? FirstLineIn(
+            Dictionary<string, Dictionary<int, int>> matchedIn,
+            string key,
+            int section)
+        {
+            return matchedIn.TryGetValue(key, out Dictionary<int, int>? bySection)
+                && bySection.TryGetValue(section, out int line)
+                    ? line
+                    : null;
         }
 
         /// <summary>

@@ -62,7 +62,7 @@ to view models. View models call services. Services produce models. Nothing call
 | Assembly | Target | Contents |
 | --- | --- | --- |
 | `GitDiffFolderCreator.exe` | net461, WinExe, UseWPF | Everything in the four layers above. |
-| `GitDiffFolderCreator.Tests.dll`           | net472, xUnit | 395 tests. References the app assembly. `InternalsVisibleTo` grants access to `internal` seams. |
+| `GitDiffFolderCreator.Tests.dll`           | net472, xUnit | 399 tests. References the app assembly. `InternalsVisibleTo` grants access to `internal` seams. |
 
 The test project targets a *higher* framework than the application. This is intentional: the
 application must run where only the .NET Framework is present, while the current xUnit packages

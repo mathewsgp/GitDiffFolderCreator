@@ -764,6 +764,16 @@ table, prose, the list of files planned for a later phase — belongs to neither
 bound the section and there is no section there. Each finding still quotes the line its claim came from,
 so a claim in the second section points at the second section rather than at line 2 of the document.
 
+**Which is why every claim carries the section it came from.** `DocumentedFile.Section` is the ordinal
+of the opening heading that claim fell under, and the verifier's duplicate detection is keyed on
+`(path, section)` rather than on the path alone. This is the second half of reading repeated sections:
+a file named in two of a document's lists — because a shared file belongs to both modules, or because
+one section writes `src/Parser.cs` and the next writes `Parser.cs` — is that document being correct,
+and reporting it would fill the findings with complaints about a document with nothing wrong with it.
+Only two claims *inside one section* are the same claim made twice. A file matched in an earlier
+section is not matched again, so it is counted once in the totals and a move is reported once however
+many sections name it.
+
 Inside the section, one rule: **a run carrying a slash is a path.** Blank lines and lines of
 commentary are skipped and the list carries on, because the section — not the first line without a
 path — is the boundary, and ending the list early would silently drop everything after it. A line
@@ -877,7 +887,7 @@ screen-reader user gets it, so nothing was lost but the width.
 
 ## 5.9 Test architecture
 
-395 tests across 30 files, all against the real behaviour.
+399 tests across 30 files, all against the real behaviour.
 
 | Category | Approach |
 | --- | --- |

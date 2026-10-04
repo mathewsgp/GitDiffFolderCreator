@@ -7,11 +7,12 @@ namespace GitDiffFolderCreator.Services
     /// <summary>One path the document claims was modified, and where the claim was.</summary>
     public sealed class DocumentedFile
     {
-        public DocumentedFile(string path, int lineNumber, string originalText)
+        public DocumentedFile(string path, int lineNumber, string originalText, int section = 1)
         {
             Path = path;
             LineNumber = lineNumber;
             OriginalText = originalText;
+            Section = section;
         }
 
         /// <summary>
@@ -30,6 +31,17 @@ namespace GitDiffFolderCreator.Services
 
         /// <summary>The document's own text, kept so a finding can quote what was actually written.</summary>
         public string OriginalText { get; }
+
+        /// <summary>
+        /// Which occurrence of the opening heading this claim came from, counting from 1.
+        /// </summary>
+        /// <remarks>
+        /// A document may repeat the section — one list per module, per phase — and the same file
+        /// legitimately appears in two of them. This is what tells a claim repeated across two sections,
+        /// which says nothing the reader did not already know, from one repeated inside a single section,
+        /// which is a duplicated entry.
+        /// </remarks>
+        public int Section { get; }
 
         public override string ToString() =>
             Path + " (line " + LineNumber.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
@@ -146,6 +158,7 @@ namespace GitDiffFolderCreator.Services
 
             bool inSection = false;
             int number = 0;
+            int section = 0;
 
             foreach (string line in lines)
             {
@@ -156,7 +169,9 @@ namespace GitDiffFolderCreator.Services
                     // Opening, not "the first one". A document may repeat the section — one per module,
                     // one per phase — and the paths in the second are as much part of the list as the
                     // first's; reading only the first would report every file in the second as a change
-                    // nobody documented.
+                    // nobody documented. Each opening is its own section, so the claims in it can be told
+                    // apart from the same claim made in another.
+                    section++;
                     inSection = true;
                     continue;
                 }
@@ -176,7 +191,7 @@ namespace GitDiffFolderCreator.Services
 
                 foreach (string path in PathsOn(line!))
                 {
-                    found.Add(new DocumentedFile(path, number, line!.Trim()));
+                    found.Add(new DocumentedFile(path, number, line!.Trim(), section));
                 }
             }
 

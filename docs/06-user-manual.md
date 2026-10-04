@@ -283,7 +283,7 @@ Press **Verify**. You get a verdict, the counts, and a list of everything the tw
 
 | Finding | What it means |
 | --- | --- |
-| Listed twice | The same path appears more than once in the document |
+| Listed twice | The same path appears twice **in one section** — a duplicated entry |
 | Wrong path | The file was **moved** rather than edited |
 | Listed, not present | The document names a file the modified source does not have |
 | Listed, not changed | The document claims an edit that is not there: both sources are identical |
@@ -335,6 +335,12 @@ lists…" — is still not a heading, and does not open the section.
 written as one list per module or per phase is checked in full rather than only in its first part.
 Whatever sits *between* two sections belongs to neither — a summary table, or a list of files planned
 for a later phase, is not read.
+
+**A file named in two sections is not a problem.** If two of a document's lists name the same file —
+because a shared file belongs to both modules, or one section writes `src/Parser.cs` and the next
+writes `Parser.cs` — that is the document being correct, and it is not reported. **Listed twice** means
+the same path appears twice *within one section*, which is a duplicated entry. A file claimed in two
+sections is still counted once in the totals, because it is one change.
 
 Two details worth knowing:
 

@@ -563,7 +563,135 @@ public sealed class ChangeDocumentMarkerTests
         Assert.Equal(250, loaded.LogLimit);
     }
 
-    // ------------------------------------------------------------------ helpers
+    // ------------------------------------------------------------------ a path in more than one section
+
+/// <summary>
+/// Claims are attributed to the section they were written in.
+/// </summary>
+/// <remarks>
+/// This is what lets the checker tell a file named in two of a document's lists from a file named twice
+/// in one of them. The first is how a document written per module looks; only the second is an error.
+/// </remarks>
+[Fact]
+public void Claims_from_two_sections_are_told_apart()
+{
+    IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
+    {
+        "[Modified Files]",
+        Bullet + " src/Editor.cs",
+        "[Status]",
+        "[Modified Files]",
+        Bullet + " src/Editor.cs",
+        "[Status]",
+    });
+
+    Assert.Equal(2, documented.Count);
+    Assert.Equal(1, documented[0].Section);
+    Assert.Equal(2, documented[1].Section);
+}
+
+[Fact]
+public async Task A_file_listed_in_two_sections_is_one_claim_and_not_a_duplicate()
+{
+    using TempDirectory root = new();
+    (string baseFolder, string modifiedFolder) = Tree(root);
+
+    Write(modifiedFolder, "src/Edited.cs", "after");
+    Write(modifiedFolder, "src/Added.cs", "new");
+
+    ChangeDocumentViewModel model = New(root.PathFor("settings.json"));
+    model.BaseFolder = baseFolder;
+    model.ModifiedFolder = modifiedFolder;
+
+    // The same file in both sections, which is what a document listing per module looks like when a
+    // module owns a shared file.
+    model.DocumentPath = TempDocx.Create(
+        root.PathFor("changes.docx"),
+        new[]
+        {
+            "[Modified Files] - Module 1",
+            Bullet + " src/Edited.cs",
+            "[Status]",
+            "[Modified Files] - Module 2",
+            Bullet + " src/Added.cs",
+            Bullet + " src/Edited.cs",
+            "[Status]",
+        });
+
+    await model.VerifyAsync();
+
+    // Nothing wrong with the document: both lists are right, and the file they share is one change.
+    Assert.True(model.VerdictIsGood);
+    Assert.Empty(model.Findings);
+}
+
+[Fact]
+public async Task A_file_listed_twice_in_one_section_is_still_a_duplicate()
+{
+    using TempDirectory root = new();
+    (string baseFolder, string modifiedFolder) = Tree(root);
+
+    Write(modifiedFolder, "src/Edited.cs", "after");
+
+    ChangeDocumentViewModel model = New(root.PathFor("settings.json"));
+    model.BaseFolder = baseFolder;
+    model.ModifiedFolder = modifiedFolder;
+
+    // One list, one entry written down twice: that is a duplicated entry rather than a shared file, and
+    // the scoping of the previous test must not swallow it.
+    model.DocumentPath = TempDocx.Create(
+        root.PathFor("changes.docx"),
+        new[]
+        {
+            "[Modified Files]",
+            Bullet + " src/Edited.cs",
+            Bullet + " src/Edited.cs",
+            "[Status]",
+        });
+
+    await model.VerifyAsync();
+
+    ChangeFinding finding = Assert.Single(model.Findings);
+    Assert.Equal(ChangeFindingKind.ListedTwice, finding.Kind);
+
+    // Counted once: the file does differ, so counting it twice would overstate what the document got
+    // right, and the summary says so in words.
+    Assert.Equal(1, model.Result!.Matches);
+}
+
+[Fact]
+public async Task Two_spellings_of_one_file_in_two_sections_are_not_a_contradiction()
+{
+    using TempDirectory root = new();
+    (string baseFolder, string modifiedFolder) = Tree(root);
+
+    Write(modifiedFolder, "src/Edited.cs", "after");
+
+    ChangeDocumentViewModel model = New(root.PathFor("settings.json"));
+    model.BaseFolder = baseFolder;
+    model.ModifiedFolder = modifiedFolder;
+
+    // One section writes the path from the root and the next from the folder down. Inside a single
+    // section that is the document disagreeing with itself; across two, it is two authors' shorthand.
+    model.DocumentPath = TempDocx.Create(
+        root.PathFor("changes.docx"),
+        new[]
+        {
+            "[Modified Files]",
+            Bullet + " src/Edited.cs",
+            "[Status]",
+            "[Modified Files]",
+            Bullet + " Edited.cs",
+            "[Status]",
+        });
+
+    await model.VerifyAsync();
+
+    Assert.True(model.VerdictIsGood);
+    Assert.Empty(model.Findings);
+}
+
+// ------------------------------------------------------------------ helpers
 
     private static ChangeDocumentViewModel New(string settingsPath)
     {
