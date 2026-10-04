@@ -1,0 +1,210 @@
+<Window x:Class="GitDiffFolderCreator.CommitDetailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:GitDiffFolderCreator.Behaviors"
+        Title="Commit details" Height="640" Width="800"
+        MinHeight="420" MinWidth="560"
+        FontSize="14"
+        Background="#F7F7F7"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Resources>
+        <!-- A failed launch is a problem and is shown as one; a successful one is only news. Driven by
+             a flag the view model sets rather than by inspecting the message text, because the answer
+             is known at the moment the message is and a wording change would not turn it red. -->
+        <Style x:Key="DiffMessageText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#5A5A5A" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding DiffMessageIsError}" Value="True">
+                    <Setter Property="Foreground" Value="#B71C1C" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <!-- Everything above the file list is short and fixed, so the list gets what is left and keeps
+         its own scrollbar rather than pushing the summary off the window on a small screen. -->
+    <Grid Margin="14,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Subject first and in full: on the log row it is trimmed to one line, which is usually
+             enough to recognise the commit but not always to know which one this is. -->
+        <StackPanel Grid.Row="0">
+            <TextBlock TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold"
+                       Text="{Binding Subject, Mode=OneWay}" />
+            <TextBlock Style="{StaticResource FieldLabel}" Margin="0,3,0,0"
+                       FontFamily="Consolas"
+                       Text="{Binding ShortHash, Mode=OneWay}" />
+        </StackPanel>
+
+        <!-- The metadata. Built as a wrapping panel of label/value pairs rather than a fixed grid,
+             because the committer row only exists when it differs and the ref list is a different
+             length on every commit; a fixed grid would leave gaps or clip whichever shape arrives. -->
+        <Border Grid.Row="1" Margin="0,10,0,0" Style="{StaticResource PanelCard}">
+            <WrapPanel>
+                <StackPanel Margin="0,0,26,6" VerticalAlignment="Top">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0" Text="Author" />
+                    <TextBlock TextTrimming="CharacterEllipsis" MaxWidth="300"
+                               Text="{Binding AuthorLine, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0,1,0,0" FontSize="11"
+                               Text="{Binding AuthorDateText, Mode=OneWay}" />
+                </StackPanel>
+
+                <!-- Shown only when the committer is someone other than the author, which is what a
+                     rebased or cherry-picked commit looks like. -->
+                <StackPanel Margin="0,0,26,6" VerticalAlignment="Top"
+                            Visibility="{Binding IsCommitterDifferent, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0" Text="Committed by" />
+                    <TextBlock TextTrimming="CharacterEllipsis" MaxWidth="300"
+                               Text="{Binding CommitterLine, Mode=OneWay}" />
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0,1,0,0" FontSize="11"
+                               Text="{Binding CommitterDateText, Mode=OneWay}" />
+                </StackPanel>
+
+                <StackPanel Margin="0,0,26,6" VerticalAlignment="Top"
+                            Visibility="{Binding ParentsText, Converter={StaticResource StringToVisibilityConverter}}">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0" Text="Parents" />
+                    <TextBlock TextTrimming="CharacterEllipsis" MaxWidth="300"
+                               Text="{Binding ParentsText, Mode=OneWay}" />
+                </StackPanel>
+
+                <StackPanel Margin="0,0,26,6" VerticalAlignment="Top"
+                            Visibility="{Binding HasRefNames, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0" Text="Refs" />
+                    <TextBlock TextTrimming="CharacterEllipsis" MaxWidth="300"
+                               Text="{Binding RefNames, Mode=OneWay}" />
+                </StackPanel>
+
+                <!-- The full object name, because an abbreviated one cannot be pasted back into a
+                     git command in a large repository where it might be ambiguous. -->
+                <StackPanel Margin="0,0,26,6" VerticalAlignment="Top">
+                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0" Text="Full hash" />
+                    <TextBlock TextTrimming="CharacterEllipsis" MaxWidth="300"
+                               FontFamily="Consolas"
+                               Text="{Binding FullHash, Mode=OneWay}" />
+                </StackPanel>
+            </WrapPanel>
+        </Border>
+
+        <!-- Only when there is one. Most commits have a single-line message, and an always-present
+             empty box would be a permanent gap in the layout saying nothing. -->
+        <Border Grid.Row="2" Margin="0,10,0,0" Style="{StaticResource PanelCard}"
+                Visibility="{Binding HasBody, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,6" Text="MESSAGE" />
+                <!-- Wrapped and selectable: a commit message is often the one thing worth copying
+                     out of this application. MinHeight rather than Height, because a message is
+                     however many lines it is: the shared field height is a minimum, and a minimum is
+                     what a taller box has to override. -->
+                <TextBox TextWrapping="Wrap" MinHeight="120" MaxHeight="180"
+                         IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                         FontSize="13" Text="{Binding Body, Mode=OneWay}" />
+            </StackPanel>
+        </Border>
+
+        <!-- Files. Read-only here: this commit is already fixed, so offering a checkbox would
+             suggest a choice that goes nowhere. -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Style="{StaticResource SectionHeading}" Text="FILES" />
+
+                <!-- The counts say how many files the commit touched even while the filter hides
+                     some of them, so a short list is never mistaken for a small commit. -->
+                <TextBlock Grid.Column="1" Style="{StaticResource FieldLabel}" Margin="10,0,0,0"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding FileSummary, Mode=OneWay}" />
+
+                <TextBox Grid.Column="2" Width="210" FontSize="12" Style="{StaticResource SearchBox}"
+                         VerticalContentAlignment="Center"
+                         ToolTip="Show only files whose path contains this text."
+                         Text="{Binding Filter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+            </Grid>
+
+            <ListBox Grid.Row="1"
+                     Background="#FFFFFF"
+                     BorderBrush="#D8DCE0" BorderThickness="1"
+                     ItemsSource="{Binding Files}"
+                     ItemContainerStyle="{StaticResource FileRow}"
+                     behaviors:DoubleClickBehavior.Command="{Binding ShowDifferenceCommand}"
+                     ToolTip="Double-click a row to open that file's two versions in your diff tool."
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0" Style="{StaticResource StatusBadge}"
+                                    ToolTip="{Binding StatusLabel, Mode=OneWay}">
+                                <TextBlock Style="{StaticResource StatusBadgeText}"
+                                           Text="{Binding StatusBadge, Mode=OneWay}" />
+                            </Border>
+
+                            <!-- Name bold, folder muted, as in the changed-files list: the same
+                                 shape in two places is easier to read than two shapes. -->
+                            <StackPanel Grid.Column="1" Margin="8,0,10,0" Orientation="Horizontal">
+                                <TextBlock FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                           Text="{Binding FileName, Mode=OneWay}" />
+                                <TextBlock Margin="6,0,0,0" Foreground="#6E6E6E" FontSize="12"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="{Binding DirectoryText, Mode=OneWay}" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="2" FontFamily="Consolas" FontSize="11"
+                                       VerticalAlignment="Center" MinWidth="96"
+                                       TextAlignment="Right"
+                                       TextTrimming="CharacterEllipsis"
+                                       Text="{Binding SizeText, Mode=OneWay}" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Grid>
+
+        <!-- Status line. The two states are exclusive: a failure is the more important one, and
+             showing a spinner next to an error would suggest the read is still running. -->
+        <TextBlock Grid.Row="4" Margin="0,10,0,0" TextWrapping="Wrap"
+                   FontSize="12" Foreground="#B71C1C"
+                   Text="{Binding ErrorMessage, Mode=OneWay}"
+                   Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}" />
+
+        <TextBlock Grid.Row="4" Margin="0,10,0,0" FontSize="12" Foreground="#5A5A5A"
+                   Text="Reading the commit..."
+                   Visibility="{Binding IsLoading, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- What the last double-click did. Without it a launch that found no diff tool, or that the
+             user's tool refused, would look exactly like a double-click that never registered. Beside
+             the button rather than in place of it, because it is the outcome of an action the user
+             took, not a state the window is in. -->
+        <TextBlock Grid.Row="4" Margin="0,10,12,0" TextWrapping="Wrap"
+                   FontSize="12" VerticalAlignment="Center"
+                   Style="{StaticResource DiffMessageText}"
+                   Text="{Binding DiffMessage, Mode=OneWay}"
+                   Visibility="{Binding HasDiffMessage, Converter={StaticResource BoolToVisibility}}" />
+
+        <!-- Close rather than OK: nothing here is edited, so there is nothing to confirm. -->
+        <Button Grid.Row="4" HorizontalAlignment="Right" MinWidth="92" Height="34"
+                Margin="0,10,0,0" IsCancel="True"
+                Content="Close" Click="CloseButton_Click" />
+    </Grid>
+</Window>

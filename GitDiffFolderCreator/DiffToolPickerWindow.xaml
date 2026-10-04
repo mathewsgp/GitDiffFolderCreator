@@ -1,0 +1,103 @@
+<Window x:Class="GitDiffFolderCreator.DiffToolPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Choose a diff tool" Height="470" Width="560"
+        MinHeight="380" MinWidth="480"
+        FontSize="14"
+        Background="#F7F7F7"
+        WindowStartupLocation="CenterOwner">
+
+    <Grid Margin="14,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- What the choice is for, in one line. Double-clicking a changed file is the only thing
+             that uses this, so the list below would otherwise be setting up an unknown action. -->
+        <TextBlock Grid.Row="0" Margin="0,0,0,10" TextWrapping="Wrap"
+                   Foreground="#4A4A4A" FontSize="12"
+                   Text="Double-clicking a changed file opens its two versions in the tool chosen here. The tool is looked for in the usual install locations." />
+
+        <ListBox Grid.Row="1"
+                 x:Name="ToolList"
+                 Background="#FFFFFF"
+                 BorderBrush="#D8DCE0" BorderThickness="1"
+                 ItemsSource="{Binding Tools}"
+                 SelectedItem="{Binding SelectedTool, Mode=TwoWay}"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="{x:Type ListBoxItem}">
+                    <Setter Property="Padding" Value="8,6" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListBox.ItemContainerStyle>
+
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock FontWeight="SemiBold" Text="{Binding DisplayName}" />
+                            <TextBlock Margin="0,2,0,0" FontSize="11" Foreground="#6E6E6E"
+                                       TextTrimming="CharacterEllipsis" Text="{Binding Detail}" />
+                        </StackPanel>
+
+                        <!-- Marked rather than described, so which one is in use needs no legend.
+                             Resources come from the application dictionary in App.xaml, not from
+                             MainWindow: a window does not inherit another window's resources, so only
+                             what is declared app-wide can be referenced from here. -->
+                        <Border Grid.Column="1" Margin="10,0,0,0"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource RolePill}"
+                                Visibility="{Binding IsChosen, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Style="{StaticResource RolePillText}"
+                                       Foreground="#2E7D32" Text="IN USE" />
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <TextBlock Grid.Row="2" Margin="0,12,0,0" TextWrapping="Wrap"
+                   FontSize="12" Foreground="#5A5A5A"
+                   Visibility="{Binding HasTools, Converter={StaticResource BoolToVisibility}}"
+                   Text="No comparison tool was found. Choose any program below, or use Browse to point at one." />
+
+        <!-- The command line that will actually be run, so the choice is not a black box. -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}" Text="Command" />
+
+            <TextBox Grid.Column="1" Margin="10,0,0,0" IsReadOnly="True"
+                     FontFamily="Consolas" FontSize="11"
+                     VerticalContentAlignment="Center"
+                     Text="{Binding CommandPreview, Mode=OneWay}" />
+
+            <Button Grid.Column="2" Margin="8,0,0,0" Padding="12,3" Content="Browse..."
+                    Command="{Binding BrowseCommand}"
+                    ToolTip="Choose any program on this computer." />
+
+            <Button Grid.Column="3" Margin="8,0,0,0" Padding="12,3" Content="Use git's"
+                    Command="{Binding UseGitConfigCommand}"
+                    ToolTip="Fall back to the diff tool configured for git." />
+
+            <Button Grid.Column="4" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}"
+                    Padding="16,3" Content="OK" IsDefault="True"
+                    Command="{Binding AcceptCommand}" />
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,1026 @@
+﻿<Window x:Class="GitDiffFolderCreator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:GitDiffFolderCreator.Behaviors"
+        xmlns:controls="clr-namespace:GitDiffFolderCreator.Controls"
+        Title="GitDiffFolderCreator" Height="780" Width="1280"
+        MinHeight="560" MinWidth="900"
+        FontSize="14"
+        Background="#F7F7F7"
+        Icon="/GitDiffFolderCreator;component/Assets/AppIcon.ico"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Closing="Window_Closing">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style TargetType="{x:Type GroupBox}">
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,4,0,0" />
+        </Style>
+        <Style x:Key="Label" TargetType="{x:Type TextBlock}">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+
+        <!-- FieldLabel lives in Controls.xaml so the diff tool picker can use it too. -->
+    </Window.Resources>
+
+    <!-- Four bands: the repository header, the two lists side by side, the action bar that stays put,
+         and a log area that only exists after a run.
+
+         The window's identity is the executable's icon, which the title bar, the taskbar and the
+         Alt+Tab switcher already read. Repeating it as a strip inside the window would only say it a
+         second time, in a place that is not there when the window is maximised or snap-assigned. -->
+    <Grid Margin="14,10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+<!-- The first card is fixed open and headerless. What identifies it is the label above each
+             control, so a caption above them would only repeat them, and a panel that cannot fold
+             should not look like it can.
+
+             Everything is on one row, aligned by its bottom edge, each control under its own label.
+             It used to be two rows of inline labels and controls: the repository above, then the
+             branch and the log controls beside it. Two rows meant the labels of the second row
+             lined up with nothing, and the eye had to walk back up to the repository to work out
+             which controls belonged together. A label above its control keeps each pair together at
+             any width.
+
+             Only the repository path is a flexible column. Everything else is sized to its own
+             content, so the controls keep their natural spacing however narrow the window gets, and
+             the path - the one field whose text can be arbitrarily long - takes what is left.
+
+             This card is about choosing what to read, and reading it: the repository, the branch,
+             how many commits, and the button that reads them again. That is the order the design
+             puts them in, in one row across the top, and it is the arrangement a user scanning the
+             window expects - the count and Refresh are read as part of the same strip as the two
+             fields they follow rather than as controls belonging to the list underneath. -->
+        <controls:CollapsibleGroupBox Grid.Row="0" Style="{StaticResource PanelHeaderless}">
+            <Grid VerticalAlignment="Bottom">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" MinWidth="160" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Repository: the field that takes the slack, because it is the only one whose
+                     text can be arbitrarily long. -->
+                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                    <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,6"
+                               Text="REPOSITORY" />
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox Grid.Column="0"
+                                 FontFamily="Consolas" FontSize="12"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="The repository to read. Typing a path here works as well as browsing to one."
+                                 Text="{Binding GitDirectory, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <Button Grid.Column="1" Margin="8,0,0,0" Padding="14,0"
+                                VerticalAlignment="Stretch" Content="Browse..."
+                                Command="{Binding BrowseGitDirectoryCommand}" />
+                    </Grid>
+                </StackPanel>
+
+                <!-- Branch. Sized to its content like the rest, with a ceiling rather than a fixed width: a
+                     long branch name should widen the field instead of being cut, but one absurd
+                     name must not push the controls beside it off the card. -->
+                <StackPanel Grid.Column="1" Margin="0,0,16,0" MaxWidth="260">
+                    <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,6"
+                               Text="BRANCH" />
+
+                    <!-- The badge describes the branch on screen, not the checkout: a sync warning
+                         about a branch nobody is reading is noise. It is the picker's trigger, and
+                         it sits inside a shell drawn like the design's input box so it reads as the
+                         value in a field rather than as a button that happens to be there. The shell
+                         is 34 tall like every other field, and the button inside it is the 32 left
+                         once the shell's own border is taken off - the same arrangement the
+                         dropdown uses, where the control that draws the field is inside the field.
+                         Left at 34 it would overfill the shell by its border and clip at the top and
+                         bottom. -->
+                    <Border Height="34" CornerRadius="4" BorderThickness="1"
+                            BorderBrush="#CBD0D6" Background="#FFFFFF">
+                    <Grid Grid.Column="0" VerticalAlignment="Center">
+                        <Button Height="32" Background="Transparent" BorderThickness="0" Padding="0"
+                                Cursor="Hand" Focusable="True"
+                                Command="{Binding ToggleBranchListCommand}"
+                                ToolTip="{Binding ActiveBranchTooltip}"
+                                AutomationProperties.HelpText="{Binding ActiveBranchTooltip}">
+                            <Button.Template>
+                                <ControlTemplate TargetType="{x:Type Button}">
+                                    <Border x:Name="Root" Background="Transparent" Padding="2,1"
+                                            CornerRadius="3" SnapsToDevicePixels="True">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Root" Property="Background" Value="#EEF0F2" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+
+                            <StackPanel Orientation="Horizontal">
+                                <!-- Out of sync with its upstream: either direction is a warning,
+                                     because both mean the two histories have moved apart. -->
+                                <Border Padding="8,3"
+                                        CornerRadius="3" BorderThickness="1" BorderBrush="#C62828"
+                                        Background="#FDECEA"
+                                        Visibility="{Binding IsActiveBranchOutOfSync, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Grid Width="15" Height="14" VerticalAlignment="Center">
+                                            <Path Stretch="Uniform" Fill="#C62828"
+                                                  Data="M 7.5,0.7 L 14.3,13.1 L 0.7,13.1 Z" />
+                                            <TextBlock Text="!" FontWeight="Bold" FontSize="9"
+                                                       Foreground="#FFFFFF" Margin="0,2,0,0"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <TextBlock Margin="6,0,0,0" FontFamily="Consolas" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#B71C1C"
+                                                   Text="{Binding ActiveBranchName}" />
+
+                                        <!-- The divergence beside the name, so it is visible without
+                                             hovering. Hidden when level, to leave the badge plain. -->
+                                        <TextBlock Margin="7,0,0,0" FontFamily="Consolas" FontSize="11"
+                                                   FontWeight="Bold" VerticalAlignment="Center"
+                                                   Foreground="#B71C1C"
+                                                   Text="{Binding ActiveBranchSyncText, Mode=OneWay}"
+                                                   Visibility="{Binding ActiveBranchSyncText, Converter={StaticResource StringToVisibilityConverter}}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Level with its upstream. -->
+                                <Border Padding="8,3"
+                                        CornerRadius="3" BorderThickness="1" BorderBrush="#BDBDBD"
+                                        Background="#F5F5F5"
+                                        Visibility="{Binding IsActiveBranchInSync, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,6,0" FontFamily="Consolas" Foreground="#2E7D32"
+                                                   VerticalAlignment="Center" Text="&#x2713;" />
+                                        <TextBlock FontFamily="Consolas" VerticalAlignment="Center"
+                                                   Text="{Binding ActiveBranchName}" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- No upstream, or nothing loaded: the name on its own. An untracked
+                                     branch is neither in sync nor out of sync, so it can only be
+                                     drawn by the fallback. -->
+                                <Border Padding="8,3"
+                                        CornerRadius="3" BorderThickness="1" BorderBrush="#D0D0D0"
+                                        Background="#F7F7F7"
+                                         Visibility="{Binding IsActiveBranchUntracked, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock FontFamily="Consolas" VerticalAlignment="Center"
+                                               Text="{Binding ActiveBranchName}" />
+                                </Border>
+
+                                <!-- A chevron, because the badge does something on click and must not
+                                     look like the plain text it used to be. -->
+                                <Path Margin="7,0,2,0" Width="9" Height="9"
+                                      VerticalAlignment="Center"
+                                      Stroke="#7A7A7A" StrokeThickness="1.5"
+                                      StrokeEndLineCap="Round" StrokeStartLineCap="Round"
+                                      Data="M 0,0 L 4.5,5 L 9,0" />
+                            </StackPanel>
+                        </Button>
+
+                        <!-- OneWay, stated explicitly: Popup.IsOpen is declared BindsTwoWayByDefault, so
+                             omitting the mode would still try to write back to a property the
+                             view model does not expose for writing. The view model owns the open
+                             state, because choosing a branch closes the picker from inside the
+                             command rather than from the popup. -->
+                        <!-- A branch browser rather than a bare list: a repository can hold hundreds
+                             of branches, so it filters by name, reports how much it is showing, and
+                             takes the keyboard. -->
+                        <Popup x:Name="BranchPopup" Placement="Bottom" VerticalOffset="2"
+                               IsOpen="{Binding IsBranchListOpen, Mode=OneWay}"
+                               StaysOpen="False" AllowsTransparency="True"
+                               PopupAnimation="None"
+                               IsVisibleChanged="BranchPopup_IsVisibleChanged"
+                               KeyDown="BranchPopup_KeyDown">
+                            <Border MinWidth="460" MaxWidth="640" MaxHeight="520"
+                                    Margin="0,2,0,0" Padding="10"
+                                    Background="#FFFFFF" BorderBrush="#C8C8C8"
+                                    BorderThickness="1" CornerRadius="3">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="12" ShadowDepth="3"
+                                                      Opacity="0.3" />
+                                </Border.Effect>
+
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Style="{StaticResource SectionHeading}"
+                                               Margin="0,0,0,6" Text="BRANCHES" />
+
+                                    <Grid Grid.Row="1" Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock Grid.Column="0" Style="{StaticResource FieldLabel}"
+                                                   Text="Filter" />
+
+                                        <TextBox x:Name="BranchFilterBox" Grid.Column="1"
+                                                 Style="{StaticResource SearchBox}"
+                                                 VerticalContentAlignment="Center"
+                                                 ToolTip="Show only branches whose name contains this text."
+                                                 Text="{Binding BranchFilter, UpdateSourceTrigger=PropertyChanged, Delay=120}" />
+
+                                        <TextBlock Grid.Column="2" Margin="8,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Style="{StaticResource FieldLabel}"
+                                                   Text="{Binding BranchFilterSummary}" />
+                                    </Grid>
+
+                                    <!-- The hint line, and the notice that replaces it when the remote
+                                         could not be reached. Said here rather than only in the status
+                                         line because this is where somebody goes to look at branches:
+                                         a list that looks complete is exactly what a failed fetch
+                                         produces, and nothing on screen would otherwise say otherwise.
+
+                                         Inside the popup on purpose. A strip in the window itself would
+                                         have to appear and disappear with the fetch, moving the row it
+                                         sits in every time it did. -->
+                                    <StackPanel Grid.Row="2">
+                                        <Border Padding="8,6" CornerRadius="3"
+                                                BorderThickness="1" BorderBrush="#E0A800" Background="#FFF8E1"
+                                                Visibility="{Binding BranchesMayBeStale, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0" TextWrapping="Wrap" FontSize="11"
+                                                           Foreground="#7A5B00"
+                                                           Text="{Binding BranchStaleNotice, Mode=OneWay}" />
+
+                                                <Button Grid.Column="1" Margin="8,0,0,0" Padding="10,2"
+                                                        VerticalAlignment="Center" FontSize="11"
+                                                        Content="Retry"
+                                                        ToolTip="Try the remote again and update the branch list from it."
+                                                        Command="{Binding RetryRemoteCommand}" />
+                                            </Grid>
+                                        </Border>
+
+                                        <TextBlock Style="{StaticResource FieldLabel}"
+                                                   FontSize="11" Margin="0,0,0,6"
+                                                   TextWrapping="Wrap"
+                                                   Text="Choosing a branch reads its log and exports from it. Nothing is checked out." />
+                                    </StackPanel>
+
+                                    <ListBox Grid.Row="3" x:Name="BranchList" FontSize="13"
+                                             Background="Transparent" BorderThickness="0"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             ItemsSource="{Binding FilteredBranches}"
+                                             SelectedItem="{Binding PendingBranch, Mode=TwoWay}"
+                                             VirtualizingPanel.IsVirtualizing="True"
+                                             VirtualizingPanel.VirtualizationMode="Recycling">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="{x:Type ListBoxItem}">
+                                                <Setter Property="Padding" Value="5,4" />
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                                        <TextBlock FontFamily="Consolas"
+                                                                   TextTrimming="CharacterEllipsis"
+                                                                   Text="{Binding Name, Mode=OneWay}" />
+
+                                                        <!-- Divergence per branch, not only for the one
+                                                             that happens to be checked out. -->
+                                                        <TextBlock Margin="7,0,0,0"
+                                                                   FontFamily="Consolas" FontSize="11"
+                                                                   FontWeight="Bold" VerticalAlignment="Center"
+                                                                   Foreground="#B3261E"
+                                                                   Text="{Binding SyncText, Mode=OneWay}"
+                                                                   Visibility="{Binding SyncText, Converter={StaticResource StringToVisibilityConverter}}" />
+                                                    </StackPanel>
+
+                                                    <TextBlock Grid.Column="1" Margin="10,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="11" Foreground="#7A7A7A"
+                                                               Text="{Binding DateText, Mode=OneWay}" />
+
+                                                    <TextBlock Grid.Column="2" Margin="8,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               FontFamily="Consolas" FontSize="11"
+                                                               Foreground="#7A7A7A"
+                                                               Text="{Binding ShortHash, Mode=OneWay}" />
+
+                                                    <!-- Remote-tracking branches are named by their
+                                                         remote, and the checked-out one is marked,
+                                                         so neither needs a legend. -->
+                                                    <TextBlock Grid.Column="3" Margin="8,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="10" FontWeight="Bold"
+                                                               Foreground="#4A7BB7"
+                                                               Text="REMOTE"
+                                                               Visibility="{Binding IsRemote, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                                                    <TextBlock Grid.Column="3" Margin="8,0,0,0"
+                                                               VerticalAlignment="Center"
+                                                               FontSize="10" FontWeight="Bold"
+                                                               Foreground="#2E7D32"
+                                                               Text="CHECKED OUT"
+                                                               Visibility="{Binding IsCurrent, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                                </Grid>
+                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+
+                                    <TextBlock Grid.Row="4" Style="{StaticResource FieldLabel}"
+                                               FontSize="11" Margin="0,8,0,0"
+                                               Text="Enter to select, Esc to close, or click away." />
+                                </Grid>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- Show last: a number with its unit beside it. The unit stays with the number it
+                     describes, rather than between the box and the button where it read as a label
+                     for the button. -->
+                <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                    <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,6"
+                               Text="Show last" />
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox Width="70"
+                                 FontFamily="Consolas" FontSize="12"
+                                 HorizontalContentAlignment="Center"
+                                 VerticalContentAlignment="Center"
+                                 ToolTip="How many commits to read from the end of the branch."
+                                 Text="{Binding LogLimit, UpdateSourceTrigger=LostFocus}" />
+
+                        <TextBlock Margin="8,0,0,0" Style="{StaticResource FieldLabel}"
+                                   VerticalAlignment="Center" Text="commits" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- A plain button, not the filled accent: the accent is reserved for the export, which
+                     is the one thing on the window that must be pressed, and two filled buttons would
+                     leave the reader choosing between them.
+
+                     Bottom-aligned rather than centred or stretched: the row is as tall as a labelled
+                     field, label above control, so a 34-tall button dropped into the middle of it
+                     sits a label's height too high and reads as belonging to nothing. The design
+                     bottom-aligns the whole row, and the state beside it already does the same. -->
+                <Button Grid.Column="3" Margin="0,0,16,0" Padding="14,0"
+                        VerticalAlignment="Bottom"
+                        Content="Refresh" Command="{Binding RefreshLogCommand}" />
+
+                <!-- The uncommitted-work count. Auto width like the rest, and after the controls the design
+                     lays out rather than inside them: the design has no slot for it, but it is state
+                     the user has to see before choosing a base, and the alternative to keeping it was
+                     to drop it. It is the one thing here that may be elided, so it takes what the
+                     path cannot use rather than competing with it. -->
+                <TextBlock Grid.Column="4" Margin="16,0,0,0" VerticalAlignment="Bottom"
+                           Height="34" MaxWidth="220" Style="{StaticResource FieldLabel}"
+                           TextTrimming="CharacterEllipsis"
+                           ToolTip="Uncommitted work in the working tree. Nothing is checked out or changed by this program."
+                           Text="{Binding WorkingTreeText}" />
+            </Grid>
+        </controls:CollapsibleGroupBox>
+
+        <!-- Master and detail, as two cards with the splitter between them. They used to be one card
+             with a hairline splitter inside it, so the two lists shared a frame and read as one
+             divided panel; the splitter had no visible grip, so it looked like a fixed margin. Two
+             frames with a grippable gap between them say "these move independently" without a caption. -->
+        <Grid Grid.Row="1" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" MinWidth="300" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="4*" MinWidth="320" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource PanelCard}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- The heading carries the progress ring, because the log below it is what is being
+                     waited on. The stage text says which git call is running, which is the only way to
+                     tell a slow fetch from a slow log read.
+
+                     How many commits to read, and the button that reads them again, are not here: the
+                     design puts them on the repository card above, in one row with the repository and
+                     branch, and that is where they are. The ring sits beside the stage text rather than
+                     at the card's right edge, because an element pinned to the right would slide the
+                     controls beside it every time a load started. -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource SectionHeading}" Text="COMMITS" />
+                        <TextBlock Margin="10,0,0,0" Style="{StaticResource FieldLabel}"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding LoadingMessage}"
+                                   Visibility="{Binding IsLoadingLog, Converter={StaticResource BooleanToVisibilityConverter}}" />
+
+                        <Grid Width="14" Height="14" Margin="8,0,0,0" VerticalAlignment="Center"
+                              RenderTransformOrigin="0.5,0.5"
+                              Visibility="{Binding IsLoadingLog, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <Grid.RenderTransform>
+                                <RotateTransform x:Name="LoadingRingRotation" />
+                            </Grid.RenderTransform>
+                            <Ellipse Width="12" Height="12" Stroke="{StaticResource ProgressAccent}" StrokeThickness="2"
+                                     StrokeDashArray="4 3" />
+                            <Ellipse Width="12" Height="12" Stroke="{StaticResource ProgressAccent}" StrokeThickness="2"
+                                     StrokeDashArray="1 6" />
+                            <Grid.Triggers>
+                                <EventTrigger RoutedEvent="Loaded">
+                                    <BeginStoryboard x:Name="RingSpin">
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetName="LoadingRingRotation"
+                                                             Storyboard.TargetProperty="Angle"
+                                                             From="0" To="360" Duration="0:0:1.1" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </EventTrigger>
+                            </Grid.Triggers>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Grid.Row="1" Style="{StaticResource FieldLabel}" Margin="0,2,0,4"
+                           TextWrapping="Wrap"
+                           Text="Click two commits to compare. Ancestry decides which is the base." />
+
+                <!-- Search over the log already in memory. Narrowing the list rather than re-reading it
+                     matters here: the commits are what the window already has, so a keystroke should
+                     cost a comparison and not a git call the user then waits on.
+
+                     The box and the count sit on one line, and the count is what makes an empty list
+                     readable - without it, a filter that matches nothing looks exactly like a repository
+                     with no commits in it. -->
+                <Grid Grid.Row="2" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox x:Name="CommitFilterBox" Grid.Column="0"
+                             Style="{StaticResource SearchBox}"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Search the loaded commits by message, hash, author or ref. Ctrl+F."
+                             Text="{Binding CommitFilter, UpdateSourceTrigger=PropertyChanged, Delay=120}" />
+
+                    <TextBlock Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center"
+                               Style="{StaticResource FieldLabel}" FontSize="11"
+                               Text="{Binding CommitFilterSummary}" />
+                </Grid>
+
+                <!-- The list is wrapped so a first load can cover it: an empty list beside a freshly
+                     chosen repository is otherwise indistinguishable from an empty repository. -->
+                <Grid Grid.Row="3">
+                <ListBox x:Name="CommitList" FontSize="13"
+                         SelectionMode="Extended"
+                         behaviors:SelectedItemsBehavior.SelectedItems="{Binding SelectedCommits, Mode=TwoWay}"
+                         behaviors:SelectedItemsBehavior.MaxSelection="2"
+                         behaviors:SelectedItemsBehavior.TruncateSelection="True"
+                         ItemsSource="{Binding FilteredCommits}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         ItemContainerStyle="{StaticResource CommitRow}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+
+                                    <!-- Fixed rather than Auto: the details button collapses when the row
+                                         is not hovered, and an Auto column would take its width with it
+                                         and reflow the subject on every pass of the pointer. -->
+                                    <ColumnDefinition Width="34" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- First line: hash, then message. The hash stays monospace so the
+                                     next one is easy to find. -->
+                                <TextBlock Grid.Row="0" Grid.Column="0" FontFamily="Consolas"
+                                           FontWeight="Bold" Foreground="#D2691E"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding ShortHash, Mode=OneWay}" />
+
+                                <TextBlock Grid.Row="0" Grid.Column="1" Margin="8,0,8,0"
+                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                           Text="{Binding Message, Mode=OneWay}" />
+
+                                <!-- The resolved role sits on the row the user just clicked, which is
+                                     the only place the direction was actually decided. -->
+                                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource RolePill}"
+                                        Visibility="{Binding Role, Converter={StaticResource CommitRoleToVisibility}, ConverterParameter=Base}">
+                                    <TextBlock Style="{StaticResource RolePillText}"
+                                               Foreground="#2F6FB5" Text="BASE" />
+                                </Border>
+
+                                <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource RolePill}"
+                                        Visibility="{Binding Role, Converter={StaticResource CommitRoleToVisibility}, ConverterParameter=Modified}">
+                                    <TextBlock Style="{StaticResource RolePillText}"
+                                               Foreground="#2E7D32" Text="MODIFIED" />
+                                </Border>
+
+                                <!-- Second line: author and date, muted, with any refs as chips. -->
+                                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                            Orientation="Horizontal" Margin="0,2,0,0">
+                                    <TextBlock Style="{StaticResource FieldLabel}" Margin="0"
+                                               FontSize="11" TextTrimming="CharacterEllipsis"
+                                               Text="{Binding Author, Mode=OneWay}" />
+                                    <TextBlock Style="{StaticResource FieldLabel}" Margin="10,0,0,0"
+                                               FontSize="11" Text="{Binding CommitDateText, Mode=OneWay}" />
+
+                                    <!-- Refs are truncated only when the list is genuinely longer than the row can
+                                     hold, so the tooltip carries the untruncated names. Without it
+                                     an ellipsis was the end of the story: there was no way to read
+                                     back the branch or tag that had been cut. -->
+                                    <Border Style="{StaticResource RefChip}"
+                                            Visibility="{Binding RefNames, Converter={StaticResource StringToVisibilityConverter}}"
+                                            ToolTip="{Binding RefNames, Mode=OneWay}">
+                                        <TextBlock Style="{StaticResource RefChipText}"
+                                                   Text="{Binding RefNames, Mode=OneWay}" />
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Everything else about this commit. Three dots rather than the word,
+                                     because the row is mostly hash and subject and a caption in
+                                     monospace-weight text was louder than the thing it described; the
+                                     tooltip and the window's name carry the wording for anyone who
+                                     cannot see the shape.
+
+                                     Shown only while the row is hovered or has keyboard focus. It spans
+                                     both rows so it lines up with the row rather than either line, and
+                                     its column is a fixed width so the subject does not jump sideways
+                                     as the button appears and disappears. -->
+                                <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3"
+                                        Width="26" Height="22" Margin="4,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Padding="0" Focusable="True"
+                                        Visibility="{Binding (behaviors:RowHover.IsHovered),
+                                                     RelativeSource={RelativeSource AncestorType=ListBoxItem},
+                                                     Converter={StaticResource BooleanToVisibilityConverter}}"
+                                        CommandParameter="{Binding}"
+                                        Click="CommitDetailsButton_Click"
+                                        AutomationProperties.Name="Show the whole commit"
+                                        ToolTip="Show the whole commit: message, author, and the files it changed.">
+                                    <!-- Drawn rather than typed: a glyph font would render the ellipsis at
+                                         whatever weight and baseline the font chose, and the row's own
+                                         text would not line up with it. -->
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <Ellipse Width="3" Height="3" Fill="#606060" />
+                                        <Ellipse Width="3" Height="3" Margin="3,0,0,0" Fill="#606060" />
+                                        <Ellipse Width="3" Height="3" Margin="3,0,0,0" Fill="#606060" />
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                    <!-- Only over the list, and only while the log is being read. An empty list beside
+                         a freshly chosen repository is otherwise indistinguishable from an empty
+                         repository. -->
+                    <Border Background="#F7F7F7"
+                            Visibility="{Binding IsLoadingLog, Converter={StaticResource BooleanToVisibilityConverter}}">
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   FontSize="12" Foreground="#5A5A5A"
+                                   Text="{Binding LoadingMessage}" />
+                    </Border>
+                </Grid>
+            </Grid>
+            </Border>
+
+            <!-- A grip, because a splitter between two framed cards has to look draggable or it
+                 reads as a fixed margin. A transparent hit area wider than the rule keeps it easy
+                 to catch without narrowing either list, and the rule lights up on hover and while
+                 dragging so the target is never guessed. -->
+            <GridSplitter Grid.Column="1" Width="14" HorizontalAlignment="Stretch"
+                          Background="Transparent" Cursor="SizeWE"
+                          ResizeBehavior="PreviousAndNext" ResizeDirection="Columns"
+                          ShowsPreview="True" Focusable="True"
+                          AutomationProperties.Name="Resize the commit and changed file lists">
+                <GridSplitter.Template>
+                    <ControlTemplate TargetType="{x:Type GridSplitter}">
+                        <Grid Background="Transparent">
+                            <Border x:Name="Grip" Width="3" Height="34"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Background="#D8DCE0" CornerRadius="1.5" />
+                        </Grid>
+                        <!-- Both states are properties of the splitter, not of the grid inside it:
+                             Grid.Triggers only accepts EventTrigger, so these belong to the template.
+                             The colours are the card border grey at rest and the accent while
+                             hovered or focused, so the grip looks like part of the cards it divides. -->
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Grip" Property="Background" Value="#9AA4AE" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Grip" Property="Background" Value="#2F6FB5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </GridSplitter.Template>
+            </GridSplitter>
+
+            <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- The heading names the two commits, so the direction is stated where the files
+                     are rather than only in a badge the user has to find. -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Style="{StaticResource SectionHeading}" Text="CHANGED FILES" />
+
+                    <!-- The two hashes and the button that reverses them, together. Swap acts on exactly
+                         what those hashes describe, so it belongs beside them: it used to sit at the far
+                         end of the row past the diff-tool button, which made the user read across the
+                         panel to connect the two. The caption is capped so a long range can never push
+                         the button off the row. -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="10,0,10,0">
+                        <TextBlock MaxWidth="260" VerticalAlignment="Center"
+                                   Style="{StaticResource SectionHeading}"
+                                   TextTrimming="CharacterEllipsis"
+                                   Text="{Binding RangeCaption}" />
+
+                        <Button Margin="8,0,0,0" Padding="10,2" FontSize="11" Content="Swap"
+                                VerticalAlignment="Center"
+                                Command="{Binding SwapRangeCommand}"
+                                ToolTip="Compare in the opposite direction." />
+                    </StackPanel>
+
+                    <!-- Which tool double-click opens, kept beside the list it applies to. It was
+                         invisible until the hand-off failed, which is the worst time to find out. -->
+                    <Button Grid.Column="2" Margin="8,0,0,0" Padding="10,2" FontSize="11"
+                            Content="{Binding DiffToolCaption}"
+                            Click="DiffToolButton_Click"
+                            ToolTip="Choose the tool that opens a changed file's two versions." />
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="0,4,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBox Grid.Column="0" MinWidth="120" Style="{StaticResource SearchBox}"
+                             VerticalContentAlignment="Center"
+                             ToolTip="Show only changed paths containing this text."
+                             Text="{Binding ChangeFilter, UpdateSourceTrigger=PropertyChanged, Delay=150}" />
+                    <ComboBox Grid.Column="1" Margin="6,0,0,0" Width="120" VerticalContentAlignment="Center"
+                              ItemsSource="{Binding StatusFilterOptions}"
+                              SelectedItem="{Binding StatusFilter, Mode=TwoWay}" />
+
+                    <!-- Choosing a subset is something most runs do not need, so it is off until
+                         asked for. The two buttons beside it exist so that a subset can be arrived
+                         at by unticking everything and ticking a few, rather than by clicking
+                         through every row that should be left out. Both are hidden with the check
+                         boxes, because with nothing to tick they would do nothing visible.
+
+                         "Choose files" rather than "Select", because "Select" beside a list of commits
+                         reads as selecting rows - which this does not do, and which the user has a
+                         separate gesture for. What it switches on is the choosing of files, which is
+                         what the check boxes are for. -->
+                    <ToggleButton Grid.Column="2" Margin="8,0,0,0" Padding="10,3" FontSize="11"
+Content="Choose files"
+                                    Command="{Binding ToggleSelectionCommand}"
+                                    IsChecked="{Binding IsSelectionEnabled, Mode=OneWay}"
+                                    ToolTip="Show a check box beside each file, to choose which files to export." />
+
+                    <StackPanel Grid.Column="3" Margin="6,0,0,0" Orientation="Horizontal"
+                                Visibility="{Binding IsSelectionEnabled, Converter={StaticResource BoolToVisibility}}">
+                        <Button Padding="8,3" FontSize="11" Content="All"
+                                Command="{Binding SelectAllCommand}"
+                                ToolTip="Tick every file." />
+                        <Button Margin="6,0,0,0" Padding="8,3" FontSize="11" Content="None"
+                                Command="{Binding DeselectAllCommand}"
+                                ToolTip="Untick every file." />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="5" Margin="8,0,0,0" Style="{StaticResource FieldLabel}"
+                               Text="{Binding FilterSummary}" />
+                </Grid>
+
+                <ListBox Grid.Row="2" FontSize="13"
+                         ItemsSource="{Binding FilteredChanges}"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         VirtualizingPanel.IsVirtualizing="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling"
+                         behaviors:DoubleClickBehavior.Command="{Binding ShowDifferenceCommand}"
+                         ToolTip="Double-click a row to open that file's two versions in your diff tool."
+                         ItemContainerStyle="{StaticResource FileRow}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Untick to leave a file out of both folders. The row stays put,
+                                     dimmed, so the choice is visible and reversible.
+
+                                     Collapsed unless the Select control is turned on: exporting
+                                     the whole range is the common case, and a column of ticked
+                                     boxes beside every path is something the eye has to skip on
+                                     every row. Collapsed rather than unbound, so the ticks are
+                                     kept and turning the option off does not silently re-include
+                                     files the user had excluded.
+
+                                     Checked for the same reason it is bound TwoWay: a tick is an
+                                     edit to the row's own state. -->
+                                <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="0,0,8,0"
+                                          IsChecked="{Binding IsIncluded, Mode=TwoWay}"
+                                          Visibility="{Binding DataContext.IsSelectionEnabled,
+                                                       RelativeSource={RelativeSource AncestorType=Window},
+                                                       Converter={StaticResource BoolToVisibility}}"
+                                          ToolTip="Include this file in the export." />
+
+                                <Border Grid.Column="1" Style="{StaticResource StatusBadge}"
+                                        ToolTip="{Binding StatusLabel, Mode=OneWay}">
+                                    <TextBlock Style="{StaticResource StatusBadgeText}"
+                                               Text="{Binding StatusBadge, Mode=OneWay}" />
+                                </Border>
+
+                                <!-- File name bold, folder muted: the name is what the user is
+                                     looking for, the path is context. -->
+                                <TextBlock Grid.Column="2" Margin="8,0,0,0"
+                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis">
+                                    <TextBlock.Style>
+                                        <Style TargetType="{x:Type TextBlock}">
+                                            <Setter Property="Foreground" Value="#222222" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Status}" Value="Deleted">
+                                                    <Setter Property="Foreground" Value="#8E1B26" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                    <Run Text="{Binding FileName, Mode=OneWay}" />
+                                </TextBlock>
+
+                                <TextBlock Grid.Column="3" Margin="8,0,0,0" Foreground="#7A7A7A"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"
+                                           Text="{Binding DirectoryText, Mode=OneWay}" />
+
+                                <!-- Fixed columns, right aligned, so the numbers line up and can be
+                                     scanned rather than read. -->
+                                <TextBlock Grid.Column="4" Width="46" Margin="10,0,0,0"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           FontFamily="Consolas" Foreground="#1B7A32"
+                                           Text="{Binding AddedText, Mode=OneWay}" />
+                                <TextBlock Grid.Column="5" Width="46" Margin="10,0,0,0"
+                                           HorizontalAlignment="Right" VerticalAlignment="Center"
+                                           FontFamily="Consolas" Foreground="#B3261E"
+                                           Text="{Binding DeletedText, Mode=OneWay}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+            </Border>
+        </Grid>
+
+        <!-- The action bar stays visible while the lists scroll, and carries everything needed to
+             start, watch and stop a run on one line. It is a card like the others: the grey fill it
+             used to have was the only band that did not match, and its content sat flush to the left
+             edge so it lined up with the band above by not being a card. -->
+        <Border Grid.Row="2" Margin="0,8,0,0" Style="{StaticResource PanelCard}">
+            <StackPanel>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Style="{StaticResource SectionHeading}"
+                               Text="OUTPUT" />
+
+                    <TextBox Grid.Column="1" Margin="12,0,0,0" VerticalContentAlignment="Center"
+                             Text="{Binding OutputDirectory, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <Button Grid.Column="2" Margin="6,0,0,0" Padding="14,3" Content="Browse..."
+                            Command="{Binding BrowseOutputDirectoryCommand}" />
+                    <!-- Two different folders, so the caption says which one. Before a run there is no
+                         result, and the button opens the configured output directory; afterwards it
+                         opens the run folder the last export produced. A single "Open" made the reader
+                         work out which, from whether the run log had anything in it. -->
+                    <Button Grid.Column="3" Margin="6,0,0,0" Padding="14,3"
+                            Content="{Binding OpenOutputCaption, Mode=OneWay}"
+                            Command="{Binding OpenOutputFolderCommand}"
+                            ToolTip="{Binding OpenOutputTooltip, Mode=OneWay}" />
+
+                    <Button Grid.Column="4" Margin="14,0,0,0" Style="{StaticResource PrimaryButton}"
+                            Content="Create Folders" Command="{Binding CreateFoldersCommand}" />
+
+                    <!-- Experimental, and unrelated to an export: it checks a Word document against the
+                         real difference between two source folders. It sits beside Create Folders
+                         because both read the folders that step makes, and a label saying so is better
+                         than a reader assuming it verifies what was just exported.
+
+                         Short, and saying what it takes rather than what it is called: the full name was
+                         wide enough to push the action bar's own controls around, and the tooltip and
+                         the accessible name still carry the whole description. -->
+                    <Button Grid.Column="5" Margin="10,0,0,0" Padding="10,3" FontSize="11"
+                            Content="Verify change document..."
+                            Click="ChangeDocumentButton_Click"
+                            ToolTip="Check a change document against the real difference between two source folders. Experimental."
+                            AutomationProperties.Name="Verify change document against two source folders (experimental)"
+                            AutomationProperties.HelpText="Check a change document against the real difference between two source folders." />
+                </Grid>
+
+                <Grid Margin="0,8,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <CheckBox Grid.Column="0" VerticalAlignment="Center"
+                              Content="Open the folder when finished"
+                              IsChecked="{Binding OpenOutputWhenFinished}" />
+
+                    <TextBlock Grid.Column="1" Margin="20,0,20,0"
+                               Style="{StaticResource FieldLabel}"
+                               FontFamily="Consolas"
+                               Text="{Binding SelectionSummary}" />
+
+                    <!-- Determinate for as much of the run as the work is countable, which is most of
+                         it: the file list is known, so the fill is the fraction of paths answered on
+                         both sides.
+
+                         The one step with no figure is the git diff that produces that list, and a bar
+                         reading 0% through the longest step reads as a hang. So the two states are
+                         separate: a sliding segment while the total is unknown, a fill once it is
+                         known. The count itself goes in the status line, which is already carrying the
+                         stage, and the caption is what a screen reader is given for the bar.
+
+                         The fill is a star column rather than a fixed width, so it stays in
+                         proportion to the track when the window is resized mid-export. Two columns
+                         rather than one, because the remainder has to be the rest of the track. -->
+                    <Grid Grid.Column="2" Height="8" Margin="0,0,20,0"
+                          MinWidth="120" MaxWidth="420" VerticalAlignment="Center" HorizontalAlignment="Left"
+                          Visibility="{Binding IsExporting, Converter={StaticResource BooleanToVisibilityConverter}}"
+                          AutomationProperties.Name="{Binding ExportProgressCaption}"
+                          AutomationProperties.HelpText="Export progress">
+                        <Border x:Name="ExportTrack" Background="{StaticResource ProgressTrack}"
+                                CornerRadius="4" SnapsToDevicePixels="True" />
+
+                        <!-- While the total is unknown. A quarter of the track, travelling in pixels
+                             because a transform cannot be given a percentage; the range is tied to
+                             the MaxWidth above, starting and ending outside it so the segment is
+                             never seen appearing or vanishing. -->
+                        <Grid Visibility="{Binding IsExportProgressKnown, Converter={StaticResource BoolToVisibilityInverted}}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="3*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border x:Name="ExportSlide" Grid.Column="0" Background="{StaticResource ProgressAccent}"
+                                    CornerRadius="4" SnapsToDevicePixels="True">
+                                <Border.RenderTransform>
+                                    <TranslateTransform x:Name="ExportSlideOffset" />
+                                </Border.RenderTransform>
+                                <Border.Triggers>
+                                    <EventTrigger RoutedEvent="Loaded">
+                                        <BeginStoryboard x:Name="ExportSlideStory">
+                                            <Storyboard RepeatBehavior="Forever">
+                                                <DoubleAnimation Storyboard.TargetName="ExportSlideOffset"
+                                                                 Storyboard.TargetProperty="X"
+                                                                 From="-130" To="550" Duration="0:0:1.6" />
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Border.Triggers>
+                            </Border>
+                        </Grid>
+
+                        <!-- Once it is known. -->
+                        <Grid x:Name="ExportFillHost"
+                              Visibility="{Binding IsExportProgressKnown}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="{Binding ExportProgressFraction, Converter={StaticResource FractionToStar}}" />
+                                <ColumnDefinition Width="{Binding ExportProgressRemainder, Converter={StaticResource FractionToStar}}" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border x:Name="ExportFill" Grid.Column="0" Background="{StaticResource ProgressAccent}"
+                                    CornerRadius="4" SnapsToDevicePixels="True" />
+                        </Grid>
+                    </Grid>
+
+                    <!-- Last, so it holds the window edge. When the bar used to sit after this button,
+                         appearing for an export pushed the button sideways, which moved the one control
+                         a cancelling user is reaching for. The row keeps its height from this button
+                         whether or not it is enabled, so nothing above shifts. -->
+                    <Button Grid.Column="3" Style="{StaticResource StopButton}"
+                            Content="Stop" ToolTip="Stop the export and discard the run folder."
+                            Command="{Binding CancelCommand}"
+                            IsEnabled="{Binding IsExporting}" />
+                </Grid>
+
+                <TextBlock Margin="0,8,0,0" TextWrapping="Wrap" Text="{Binding Status}">
+                    <TextBlock.Style>
+                        <Style TargetType="{x:Type TextBlock}">
+                            <Setter Property="Foreground" Value="#333333" />
+                            <Setter Property="FontSize" Value="12" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                                    <Setter Property="Foreground" Value="#B00020" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+        <!-- The run log replaces the old always-present empty Result panel: it takes up no room at
+             all until there is a run to report. -->
+        <controls:CollapsibleGroupBox Grid.Row="3" Margin="0,8,0,0"
+                                      Header="Run Log"
+                                      Style="{StaticResource PanelCaptioned}"
+                                      IsCollapsible="True"
+                                      IsExpanded="{Binding IsResultExpanded, Mode=TwoWay}"
+                                      Visibility="{Binding HasOutputLog, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBox MinHeight="80" MaxHeight="150"
+                     IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                     FontFamily="Consolas" FontSize="12"
+                     Foreground="#333333"
+                     VerticalScrollBarVisibility="Auto"
+                     Text="{Binding OutputLog, Mode=OneWay}" />
+        </controls:CollapsibleGroupBox>
+    </Grid>
+</Window>
