@@ -95,6 +95,8 @@
 | FR-108 | **Experimental.** A documented path **MUST** carry at least one `/` or `\`; a bare file name **MUST NOT** be read as a path. Two paths **MAY** share one line when separated by a tab or by two or more spaces. |
 | FR-109 | **Experimental.** The system **MUST** normalise a documented path before matching it — separators unified to `/`, surrounding whitespace and slashes trimmed, a leading `./` dropped — and **MUST** apply the same normalisation to the source path, so that neither side can match by accident. |
 | FR-110 | **Experimental.** A documented path **MUST** count as matching a source file when it is that path or a trailing sequence of its folders. The tail **MUST** land on a folder boundary, and a tail that two or more files could answer **MUST** be reported as naming nothing rather than resolved to one of them. |
+| FR-111 | **Experimental.** The user **MUST** be able to name the two headings that bound the documented file list, defaulting to `[Modified Files]` and `[Status]`. A heading **MUST** match the whole line, ignoring case and any surrounding brackets or trailing colon, so the marker need not be spelled exactly as the document spells it. |
+| FR-112 | **Experimental.** A marker left blank **MUST** mean the default rather than no marker, because clearing the box is not a request for a document that cannot be read. |
 | FR-92 | **Experimental.** The system **MUST** report every disagreement in both directions: a path listed but not changed, a path changed but not listed, and a path that names no file in either source. |
 | FR-93 | **Experimental.** The system **MUST** treat a moved file as one change at its new path, and **MUST** tell the reader which path it moved from rather than reporting a deletion and an addition. |
 | FR-94 | **Experimental.** The system **MUST** state how many files it compared and how many it left out, so that a pass is a statement about the tree rather than an absence of complaints. |
@@ -150,10 +152,11 @@
 
 | ID | Requirement |
 | --- | --- |
-| FR-69 | The system **MUST** persist the repository path, output folder, log size, "open when finished" preference and chosen diff tool. |
+| FR-69 | The system **MUST** persist the repository path, output folder, log size, "open when finished" preference, chosen diff tool and change-document section markers. |
 | FR-70 | A settings file written by an earlier version, or hand-edited to be incomplete, **MUST** load without error and **MUST** fall back to defaults for any absent member. |
 | FR-71 | Collapsed panel state **SHOULD** persist, so a user's layout survives a restart. |
 | FR-72 | A transient setting such as whether the selection checkboxes are showing **MUST NOT** persist; it describes the current session, not a preference. |
+| FR-73 | A window that writes one part of the settings file **MUST NOT** discard the parts another window owns; each **MUST** read the file, change its own members and write it back. |
 
 ## 2.10 Status and feedback
 

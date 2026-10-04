@@ -248,6 +248,14 @@ Inside the section, numbering and bullets are optional, blank lines and commenta
 ending the list, two paths may share a line, and every path must contain a `/` or a `\` - so a bare
 `Parser.cs` is not read as one. A space in a folder name is fine; a space in the file name is not.
 
+**CHANGED FILES START MARKER** and **CHANGED FILES END MARKER** name those two headings, so a document
+that does not use `Modified Files` and `Status` can still be read - type what your document actually
+says, brackets, colon and all. The comparison ignores case and the brackets either way, so the marker
+does not have to be spelled exactly; **Defaults** puts `[Modified Files]` and `[Status]` back. A marker
+left blank means the default rather than no marker, because a reader who clears a box has not asked for
+a document that cannot be read. The two are remembered between sessions, so nobody has to name their own
+headings twice.
+
 Both sides of a comparison are normalised the same way: separators unified to `/`, surrounding
 whitespace and slashes trimmed, a leading `./` dropped. Matching then reads each claim **from the
 right**, on whole folders, and a claim matches when it is the whole of a real path or the tail of one.

@@ -31,19 +31,28 @@ namespace GitDiffFolderCreator
         }
 
         /// <summary>Shows the checker over the given owner.</summary>
+        /// <remarks>
+        /// Given a settings store of its own, because this window is the one that owns the two section
+        /// markers and it has to read them before anything is shown and write them back after. Saving
+        /// again as the window closes covers the one edit the binding never saw: a marker typed and the
+        /// window shut without the focus ever leaving the box.
+        /// </remarks>
         public static void Show(Window? owner)
         {
             ChangeDocumentViewModel model = new ChangeDocumentViewModel(
                 (start, title) => ShellFolderPicker.Pick(start, title),
                 PickDocument,
                 PickReportFile,
-                CopyToClipboard);
+                CopyToClipboard,
+                new AppSettingsStore(null));
 
             ChangeDocumentWindow window = new ChangeDocumentWindow
             {
                 DataContext = model,
                 Owner = owner,
             };
+
+            window.Closed += (_, _) => model.SaveMarkers();
 
             window.ShowDialog();
         }

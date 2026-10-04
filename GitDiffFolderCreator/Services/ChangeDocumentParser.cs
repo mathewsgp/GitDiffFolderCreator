@@ -47,6 +47,11 @@ namespace GitDiffFolderCreator.Services
     /// between are not errors: they are skipped, and the section carries on.
     /// </para>
     /// <para>
+    /// Which two headings those are is the reader's choice, because change documents are written by
+    /// hand and by no two teams alike; <see cref="DefaultStartMarker"/> and <see cref="DefaultEndMarker"/>
+    /// are what is used when nothing else is named.
+    /// </para>
+    /// <para>
     /// This is a deliberate simplification. Reading a whole document for anything path-shaped found
     /// more than it should — a URL, a version range, half a sentence — and every one of those needed a
     /// rule explaining why it was not a path. A section bounded by two headings needs none: a path in
@@ -62,11 +67,22 @@ namespace GitDiffFolderCreator.Services
     /// </remarks>
     public static class ChangeDocumentParser
     {
-        /// <summary>The heading that opens the list.</summary>
-        private const string ModifiedFilesHeading = "Modified Files";
+        /// <summary>
+        /// The heading that opens the list, for a document that does not name its own.
+        /// </summary>
+        /// <remarks>
+        /// The brackets are part of how the heading is written rather than part of what it says: the
+        /// comparison strips them from both sides, so <c>Modified Files</c> and <c>[Modified Files]:</c>
+        /// open the same section. They are written here because that is how the documents this was written
+        /// against spell it, so the default reads the same as the document does.
+        /// </remarks>
+        public const string DefaultStartMarker = "[Modified Files]";
 
-        /// <summary>The heading that closes it. Everything after this belongs to something else.</summary>
-        private const string StatusHeading = "Status";
+        /// <summary>
+        /// The heading that closes it, for a document that does not name its own. Everything after this
+        /// belongs to something else.
+        /// </summary>
+        public const string DefaultEndMarker = "[Status]";
 
         /// <summary>
         /// Where one path ends and the next begins on a line: a tab, or a run of two or more spaces.
@@ -102,12 +118,31 @@ namespace GitDiffFolderCreator.Services
         /// </remarks>
         public static IList<DocumentedFile> Parse(IEnumerable<string> lines)
         {
+            return Parse(lines, DefaultStartMarker, DefaultEndMarker);
+        }
+
+        /// <summary>
+        /// The documented paths between the two headings the reader named.
+        /// </summary>
+        /// <remarks>
+        /// A blank marker names no heading: a blank opening one reads as nothing at all, and a blank
+        /// closing one leaves the list running to the end of the document. Both are answers rather than
+        /// failures, so nothing here needs to refuse them.
+        /// </remarks>
+        public static IList<DocumentedFile> Parse(
+            IEnumerable<string> lines,
+            string? startMarker,
+            string? endMarker)
+        {
             var found = new List<DocumentedFile>();
 
             if (lines == null)
             {
                 return found;
             }
+
+            string? start = HeadingKey(startMarker);
+            string? end = HeadingKey(endMarker);
 
             bool inSection = false;
             int number = 0;
@@ -116,13 +151,13 @@ namespace GitDiffFolderCreator.Services
             {
                 number++;
 
-                if (IsHeading(line, ModifiedFilesHeading))
+                if (start != null && IsHeading(line, start))
                 {
                     inSection = true;
                     continue;
                 }
 
-                if (inSection && IsHeading(line, StatusHeading))
+                if (inSection && end != null && IsHeading(line, end))
                 {
                     // Everything past the closing heading is a different section: a status table, a
                     // test plan, a list of files for a later phase.
@@ -153,16 +188,31 @@ namespace GitDiffFolderCreator.Services
         /// "the Modified Files section lists…" is a sentence that happens to contain one, and treating
         /// that as the heading would open the section in the wrong place.
         /// </remarks>
-        private static bool IsHeading(string? line, string heading)
+        private static bool IsHeading(string? line, string key)
         {
-            if (string.IsNullOrWhiteSpace(line))
+            return string.Equals(HeadingKey(line), key, StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Puts a heading into the one form two headings are compared in, or answers null for anything
+        /// that is not one.
+        /// </summary>
+        /// <remarks>
+        /// Applied to the configured marker as well as to the line, which is what lets the marker be typed
+        /// the way the document spells it — with or without brackets, with or without the trailing colon
+        /// — without the two having to agree on which of those it is. A marker of nothing but brackets
+        /// or a colon is not a heading and is refused here rather than matching some unrelated line.
+        /// </remarks>
+        private static string? HeadingKey(string? heading)
+        {
+            if (string.IsNullOrWhiteSpace(heading))
             {
-                return false;
+                return null;
             }
 
-            string text = line!.Trim().Trim('[', ']', ':', ' ').Trim();
+            string key = heading!.Trim().Trim('[', ']', ':', ' ').Trim();
 
-            return string.Equals(text, heading, StringComparison.OrdinalIgnoreCase);
+            return key.Length == 0 ? null : key;
         }
 
         /// <summary>Every path on one line, in the order they appear.</summary>

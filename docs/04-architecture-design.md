@@ -62,7 +62,7 @@ to view models. View models call services. Services produce models. Nothing call
 | Assembly | Target | Contents |
 | --- | --- | --- |
 | `GitDiffFolderCreator.exe` | net461, WinExe, UseWPF | Everything in the four layers above. |
-| `GitDiffFolderCreator.Tests.dll`           | net472, xUnit | 360 tests. References the app assembly. `InternalsVisibleTo` grants access to `internal` seams. |
+| `GitDiffFolderCreator.Tests.dll`           | net472, xUnit | 388 tests. References the app assembly. `InternalsVisibleTo` grants access to `internal` seams. |
 
 The test project targets a *higher* framework than the application. This is intentional: the
 application must run where only the .NET Framework is present, while the current xUnit packages
@@ -224,12 +224,18 @@ ChangeDocumentWindow  ──►  ChangeDocumentViewModel
                     ChangeDocumentVerifier ─────────────────┘
 ```
 
-The parser is deliberately not a prose reader. It looks for the `[Modified Files]` heading, reads to
-`[Status]`, and takes every run carrying a slash in between — which is the whole of the rule, and the
+The parser is deliberately not a prose reader. It looks for the configured start heading, reads to the
+configured end heading — `[Modified Files]` and `[Status]` unless the user has named others — and takes
+every run carrying a slash in between — which is the whole of the rule, and the
 reason a URL, a version range or half a sentence elsewhere in the document cannot become a finding
 about a file that does not exist. Matching is the mirror image of that: a claim is normalised and
 compared against the real paths from the right, on whole folders, so a path written from part way down
 the tree still names its file. See §5.8.6.
+
+The markers are the one thing this feature shares with the rest of the application, and it shares only
+the settings file: the checker window writes them, and the main window — which saves the same file on
+close — reads it and overwrites only its own members. Writing that file from scratch on close would
+drop the markers every time the window shut.
 
 It reuses one idea from the export and nothing else: §5.3.3a's rule that a check must report only
 what nothing else explains, and its case-insensitive comparison. It shares no code with `DiffExporter`,

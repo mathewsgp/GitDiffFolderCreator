@@ -275,6 +275,10 @@ things:
 | **Modified source** | The source tree *containing* the changes |
 | **Change document** | The Word `.docx` that lists the changed files |
 
+Two boxes below those name the headings the list is read between, and are remembered between sessions.
+They only need changing if your document does not use `[Modified Files]` and `[Status]` — see *If your
+document names its sections differently* below.
+
 Press **Verify**. You get a verdict, the counts, and a list of everything the two disagree about:
 
 | Finding | What it means |
@@ -308,6 +312,28 @@ Everything between `[Modified Files]` and `[Status]` is read as the list; everyt
 ignored, so the "Root cause" and "Fix" paragraphs — and any example list earlier in the document —
 cannot turn into findings.
 
+### If your document names its sections differently
+
+Change documents are written by hand, so the two headings are not standardised. Two boxes under the
+document path name them:
+
+| Box | Default | What it means |
+| --- | --- | --- |
+| **CHANGED FILES START MARKER** | `[Modified Files]` | the heading the list starts at |
+| **CHANGED FILES END MARKER** | `[Status]` | the heading the list ends at |
+
+Type what your document actually writes. Case, the square brackets and a trailing colon are ignored on
+both sides, so `## Files Changed` matches `## files changed:` and you do not have to copy the heading
+character for character. **Defaults** puts both back.
+
+Two details worth knowing:
+
+- **A blank box means the default**, not "no marker". Clearing the box is treated as "I did not mean to
+  change this", because a document read with no opening marker lists nothing and the verdict then
+  reports every real change as undeclared.
+- **The markers are remembered** between sessions, so a document that uses `## Files Changed` only has to
+  be described once. The two are saved together, because half a pair is a list read in the wrong place.
+
 Inside the section:
 
 - **Numbering and bullets are optional.** `1.`, `2)`, `(3)`, `-` and `•` are stripped, and a path is a
@@ -321,8 +347,9 @@ Inside the section:
 - **`\` and `/` are the same separator**, and a leading `\` or `/` and a leading `./` are dropped.
   So `\Src\Parser.cs`, `/Src/Parser.cs` and `./Src/Parser.cs` all name `Src/Parser.cs`.
 
-A document without a `[Modified Files]` section lists nothing, and the verdict then reports every real
-change as undeclared rather than agreeing with a list the document never made.
+A document without a `[Modified Files]` section — and so does one whose start marker is not in it — lists
+nothing, and the verdict then reports every real change as undeclared rather than agreeing with a list
+the document never made.
 
 ### Paths need not start at the repository root
 

@@ -18,6 +18,8 @@ namespace GitDiffFolderCreator.Services
             OpenOutputWhenFinished = true;
             CollapsedSections = string.Empty;
             DiffToolCommand = string.Empty;
+            ChangedFilesStartMarker = ChangeDocumentParser.DefaultStartMarker;
+            ChangedFilesEndMarker = ChangeDocumentParser.DefaultEndMarker;
         }
 
         /// <summary>
@@ -43,6 +45,16 @@ namespace GitDiffFolderCreator.Services
             OutputDirectory = OutputDirectory ?? string.Empty;
             CollapsedSections = CollapsedSections ?? string.Empty;
             DiffToolCommand = DiffToolCommand ?? string.Empty;
+
+            // The two markers are the exception to the rule above: a reader who cleared the box did not
+            // ask for a document that cannot be read, so an absent or blank marker means the default
+            // rather than an empty string. The window does the same to what is typed before it is stored.
+            ChangedFilesStartMarker = MarkerOrDefault(
+                ChangedFilesStartMarker,
+                ChangeDocumentParser.DefaultStartMarker);
+            ChangedFilesEndMarker = MarkerOrDefault(
+                ChangedFilesEndMarker,
+                ChangeDocumentParser.DefaultEndMarker);
         }
 
         [DataMember(Name = "gitDirectory")]
@@ -81,6 +93,34 @@ namespace GitDiffFolderCreator.Services
         /// </remarks>
         [DataMember(Name = "diffToolCommand")]
         public string DiffToolCommand { get; set; }
+
+        /// <summary>
+        /// The heading the changed-file list starts at, as the document spells it.
+        /// </summary>
+        /// <remarks>
+        /// Stored with the brackets and any colon, because that is how the reader typed it and it is what
+        /// they will recognise when they come back to it; the parser strips them before comparing.
+        /// </remarks>
+        [DataMember(Name = "changedFilesStartMarker")]
+        public string ChangedFilesStartMarker { get; set; }
+
+        /// <summary>
+        /// The heading the changed-file list ends at. Everything after it belongs to another section.
+        /// </summary>
+        [DataMember(Name = "changedFilesEndMarker")]
+        public string ChangedFilesEndMarker { get; set; }
+
+        /// <summary>
+        /// A usable marker: the one given, or the default when none was.
+        /// </summary>
+        /// <remarks>
+        /// Shared with the view model, which has the same problem with a box the reader has just emptied
+        /// and which must not save something it could not itself read back.
+        /// </remarks>
+        internal static string MarkerOrDefault(string? marker, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(marker) ? fallback : marker!.Trim();
+        }
     }
 
     /// <summary>

@@ -1,8 +1,8 @@
 <Window x:Class="GitDiffFolderCreator.ChangeDocumentWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Verify change document" Height="660" Width="820"
-        MinHeight="520" MinWidth="680"
+        Title="Verify change document" Height="720" Width="820"
+        MinHeight="560" MinWidth="680"
         FontSize="14"
         Background="#F7F7F7"
         WindowStartupLocation="CenterOwner">
@@ -23,10 +23,12 @@
                    Foreground="#4A4A4A" FontSize="12"
                    Text="Point at the source tree before the changes, the source tree after them, and the Word document that lists the changed files. Every difference between the two folders is compared with what the document says." />
 
-        <!-- The three inputs. Labelled above their controls rather than beside them, so a long path
-             has the whole width and the pair does not have to be inferred. -->
+        <!-- What the check is pointed at, and the two headings it reads between. Labelled above their
+             controls rather than beside them, so a long path has the whole width and the pair does not
+             have to be inferred. -->
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -84,6 +86,39 @@
 
                 <Button Grid.Column="1" Margin="8,0,0,0" Padding="14,0" VerticalAlignment="Bottom"
                         Content="Browse..." Command="{Binding BrowseDocumentCommand}" />
+            </Grid>
+
+            <!-- The two headings the list is read between. Change documents are written by hand, so the
+                 headings are a setting rather than fixed text: a reader whose document says
+                 "[Files Changed]" has to be able to say so. Kept under the document they describe,
+                 because that is what they are, and side by side because they are one setting read as two. -->
+            <Grid Grid.Row="3" Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,6"
+                               Text="CHANGED FILES START MARKER" />
+                    <TextBox FontFamily="Consolas" VerticalContentAlignment="Center"
+                             ToolTip="The heading the list of changed files starts at, written the way the document writes it. Everything between it and the end marker is read as the list. Leave it blank to use [Modified Files]."
+                             Text="{Binding ChangedFilesStartMarker, UpdateSourceTrigger=LostFocus}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Margin="6,0,0,0">
+                    <TextBlock Style="{StaticResource SectionHeading}" Margin="0,0,0,6"
+                               Text="CHANGED FILES END MARKER" />
+                    <TextBox FontFamily="Consolas" VerticalContentAlignment="Center"
+                             ToolTip="The heading the list of changed files ends at. Everything after it belongs to another section and is not read. Leave it blank to use [Status]."
+                             Text="{Binding ChangedFilesEndMarker, UpdateSourceTrigger=LostFocus}" />
+                </StackPanel>
+
+                <Button Grid.Column="2" Margin="8,6,0,0" Padding="10,0" VerticalAlignment="Bottom"
+                        Content="Defaults"
+                        Command="{Binding RestoreDefaultMarkersCommand}"
+                        ToolTip="Put both markers back to [Modified Files] and [Status]." />
             </Grid>
         </Grid>
 

@@ -1360,15 +1360,19 @@ namespace GitDiffFolderCreator.ViewModels
 
         public void SaveSettings()
         {
-            _settingsStore.Save(new AppSettings
-            {
-                GitDirectory = GitDirectory,
-                OutputDirectory = OutputDirectory,
-                LogLimit = LogLimit,
-                OpenOutputWhenFinished = OpenOutputWhenFinished,
-                CollapsedSections = CollapsedSectionList,
-                DiffToolCommand = DiffToolCommand,
-            });
+            // Read first and overwrite only what this window owns. The change-document markers are
+            // written by another window out of the same file, and a file rebuilt from these six fields
+            // alone would drop them every time this one closed.
+            AppSettings settings = _settingsStore.Load();
+
+            settings.GitDirectory = GitDirectory;
+            settings.OutputDirectory = OutputDirectory;
+            settings.LogLimit = LogLimit;
+            settings.OpenOutputWhenFinished = OpenOutputWhenFinished;
+            settings.CollapsedSections = CollapsedSectionList;
+            settings.DiffToolCommand = DiffToolCommand;
+
+            _settingsStore.Save(settings);
         }
 
         /// <summary>

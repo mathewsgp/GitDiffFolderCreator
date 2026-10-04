@@ -728,10 +728,31 @@ two-column row into two lines.
 
 **Finding the paths.** The document is read as what it is — a document with a section in it — rather
 than as prose to be mined for anything path-shaped. Two headings bound the list: everything between
-`[Modified Files]` and `[Status]` is the list, and everything outside it is not. The headings are
+the start heading and the end heading is the list, and everything outside it is not. The headings are
 compared as whole lines with the brackets and a trailing colon stripped, so `[Modified Files]`,
 `[Modified Files]:` and `Modified Files` are the same heading while *"the Modified Files section
 below lists…"* is a sentence that happens to contain one.
+
+**Which two headings is a setting, not a constant.** They default to `[Modified Files]` and `[Status]`,
+but they come from the settings file and are editable in the checker window, because change documents
+are written by hand and no two teams spell their sections alike. A document whose headings are
+`## Files Changed` and `## Verification` read against the defaults yields *no paths at all*, and no
+paths is reported as agreement — the tool never looked. The failure is silent and total, which is the
+kind that only the reader can rule out.
+
+Two decisions make the setting usable rather than a spelling test:
+
+- **the same normalisation is applied to the marker as to the line**, so brackets, a trailing colon and
+  case are incidental on both sides. The marker is typed once, in settings, and the document is typed
+  again every time it is written; requiring an exact match would mean the setting fails whenever the
+  author capitalises a heading differently;
+- **a blank marker means the default, not "no marker"**. A blank opening marker would read nothing, and
+  a blank closing marker would run the list to the end of the document — both are answers rather than
+  failures in the parser, but neither is what somebody who cleared a box meant, so the settings layer
+  substitutes the default before either the parse or the write.
+
+The parser takes the two markers as parameters and holds no state, so the default pair is a one-line
+overload rather than a branch inside the scan.
 
 Inside the section, one rule: **a run carrying a slash is a path.** Blank lines and lines of
 commentary are skipped and the list carries on, because the section — not the first line without a
@@ -846,7 +867,7 @@ screen-reader user gets it, so nothing was lost but the width.
 
 ## 5.9 Test architecture
 
-369 tests across 29 files, all against the real behaviour.
+388 tests across 30 files, all against the real behaviour.
 
 | Category | Approach |
 | --- | --- |

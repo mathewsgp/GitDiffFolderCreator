@@ -22,6 +22,12 @@ namespace GitDiffFolderCreator.ViewModels
     /// file, and doing that on the UI thread would freeze the window for as long as it takes. Results
     /// arrive back through the synchronisation context, so only the assignment is left to the UI thread.
     /// </para>
+    /// <para>
+    /// The two headings the changed-file list is read between are settings rather than fixed text,
+    /// because a change document is written by hand and no two are laid out alike. They are the only
+    /// inputs here that outlive the window: the folders and the document are chosen fresh every time,
+    /// but nobody should have to name their own headings twice.
+    /// </para>
     /// </remarks>
     public sealed class ChangeDocumentViewModel : BindableBase
     {
@@ -29,9 +35,11 @@ namespace GitDiffFolderCreator.ViewModels
         private readonly Func<string, string?> _pickDocument;
         private readonly Func<string, string?> _pickReportFile;
         private readonly Action<string> _copyText;
+        private readonly AppSettingsStore? _settingsStore;
         private readonly RelayCommand _browseBaseCommand;
         private readonly RelayCommand _browseModifiedCommand;
         private readonly RelayCommand _browseDocumentCommand;
+        private readonly RelayCommand _restoreDefaultMarkersCommand;
         private readonly AsyncRelayCommand _verifyCommand;
         private readonly RelayCommand _copyReportCommand;
         private readonly RelayCommand _exportReportCommand;
@@ -40,6 +48,8 @@ namespace GitDiffFolderCreator.ViewModels
         private string _modifiedFolder = string.Empty;
         private string _documentPath = string.Empty;
         private bool _ignoreBuildOutput = true;
+        private string _changedFilesStartMarker = ChangeDocumentParser.DefaultStartMarker;
+        private string _changedFilesEndMarker = ChangeDocumentParser.DefaultEndMarker;
         private string? _error;
         private ChangeVerificationResult? _result;
         private bool _isVerifying;
@@ -48,7 +58,8 @@ namespace GitDiffFolderCreator.ViewModels
             Func<string, string, string?> pickFolder,
             Func<string, string?> pickDocument,
             Func<string, string?>? pickReportFile = null,
-            Action<string>? copyText = null)
+            Action<string>? copyText = null,
+            AppSettingsStore? settingsStore = null)
         {
             _pickFolder = pickFolder ?? throw new ArgumentNullException(nameof(pickFolder));
             _pickDocument = pickDocument ?? throw new ArgumentNullException(nameof(pickDocument));
@@ -59,14 +70,23 @@ namespace GitDiffFolderCreator.ViewModels
             _pickReportFile = pickReportFile ?? (_ => null);
             _copyText = copyText ?? (_ => { });
 
+            // Optional for the same reason, but with a sharper edge: a store built here would point at
+            // the real settings file, so a caller that meant to verify against a fixture would instead
+            // read and rewrite the settings of whoever is running it. No store means nothing is kept,
+            // which is a smaller mistake than that one.
+            _settingsStore = settingsStore;
+
             _browseBaseCommand = new RelayCommand(_ => BrowseBase());
             _browseModifiedCommand = new RelayCommand(_ => BrowseModified());
             _browseDocumentCommand = new RelayCommand(_ => BrowseDocument());
+            _restoreDefaultMarkersCommand = new RelayCommand(_ => RestoreDefaultMarkers());
             _verifyCommand = new AsyncRelayCommand(_ => VerifyAsync(), _ => CanVerify);
             _copyReportCommand = new RelayCommand(_ => CopyReport(), _ => CanReport);
             _exportReportCommand = new RelayCommand(_ => ExportReport(), _ => CanReport);
 
             Findings = new ObservableCollection<ChangeFinding>();
+
+            ReadMarkers();
         }
 
         /// <summary>The source tree before the changes.</summary>
@@ -121,6 +141,57 @@ namespace GitDiffFolderCreator.ViewModels
             get { return _ignoreBuildOutput; }
             set { SetProperty(ref _ignoreBuildOutput, value); }
         }
+
+        /// <summary>
+        /// The heading the changed-file list starts at, as the document spells it.
+        /// </summary>
+        /// <remarks>
+        /// Saved as soon as it is edited, for the reason the diff tool's choice is: a checker that has to
+        /// be told its own headings again after a crash is a checker that will quietly report nothing.
+        /// </remarks>
+        public string ChangedFilesStartMarker
+        {
+            get { return _changedFilesStartMarker; }
+            set
+            {
+                if (SetProperty(ref _changedFilesStartMarker, value ?? string.Empty))
+                {
+                    SaveMarkers();
+                }
+            }
+        }
+
+        /// <summary>
+        /// The heading the changed-file list ends at. Everything after it belongs to another section.
+        /// </summary>
+        /// <remarks>
+        /// Saved alongside <see cref="ChangedFilesStartMarker"/>, because the pair is one setting: half
+        /// of it remembered and half of it not is a list read to the wrong place.
+        /// </remarks>
+        public string ChangedFilesEndMarker
+        {
+            get { return _changedFilesEndMarker; }
+            set
+            {
+                if (SetProperty(ref _changedFilesEndMarker, value ?? string.Empty))
+                {
+                    SaveMarkers();
+                }
+            }
+        }
+
+        /// <summary>Puts both markers back to what the documents this was written against use.</summary>
+        public RelayCommand RestoreDefaultMarkersCommand => _restoreDefaultMarkersCommand;
+
+        /// <summary>The markers as they will be read, with a blank one falling back to the default.</summary>
+        private string EffectiveStartMarker => AppSettings.MarkerOrDefault(
+            ChangedFilesStartMarker,
+            ChangeDocumentParser.DefaultStartMarker);
+
+        /// <summary>The markers as they will be read, with a blank one falling back to the default.</summary>
+        private string EffectiveEndMarker => AppSettings.MarkerOrDefault(
+            ChangedFilesEndMarker,
+            ChangeDocumentParser.DefaultEndMarker);
 
         /// <summary>The findings, worst first, or empty until a verification has run.</summary>
         public ObservableCollection<ChangeFinding> Findings { get; }
@@ -288,6 +359,55 @@ namespace GitDiffFolderCreator.ViewModels
         }
 
         /// <summary>
+        /// Takes the markers from the settings file, or the defaults when there is nothing to take them
+        /// from.
+        /// </summary>
+        private void ReadMarkers()
+        {
+            AppSettings settings = _settingsStore?.Load() ?? new AppSettings();
+
+            _changedFilesStartMarker = settings.ChangedFilesStartMarker;
+            _changedFilesEndMarker = settings.ChangedFilesEndMarker;
+        }
+
+        /// <summary>
+        /// Records the two markers, leaving every other setting as it is.
+        /// </summary>
+        /// <remarks>
+        /// Read, changed and written back rather than written out whole, because the main window saves the
+        /// same file and knows nothing about these two: a file rebuilt from its own fields alone would
+        /// drop them every time it closed.
+        /// </remarks>
+        public void SaveMarkers()
+        {
+            if (_settingsStore == null)
+            {
+                return;
+            }
+
+            try
+            {
+                AppSettings settings = _settingsStore.Load();
+                settings.ChangedFilesStartMarker = EffectiveStartMarker;
+                settings.ChangedFilesEndMarker = EffectiveEndMarker;
+                _settingsStore.Save(settings);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // The markers still apply to this session, and the next attempt reports its own failure.
+                // Refusing the edit over an unwritable file would be the worse of the two.
+            }
+        }
+
+        private void RestoreDefaultMarkers()
+        {
+            // Assigned through the properties rather than the fields, so the defaults are saved on the
+            // same path as any other edit.
+            ChangedFilesStartMarker = ChangeDocumentParser.DefaultStartMarker;
+            ChangedFilesEndMarker = ChangeDocumentParser.DefaultEndMarker;
+        }
+
+        /// <summary>
         /// Puts the findings on the clipboard as CSV, which is what a spreadsheet or a ticket wants.
         /// </summary>
         /// <remarks>
@@ -405,10 +525,15 @@ namespace GitDiffFolderCreator.ViewModels
                 string modifiedFolder = ModifiedFolder.Trim();
                 string documentPath = DocumentPath.Trim();
 
+                // Read on the worker along with the document, and taken as they are now rather than when
+                // the window opened: the reader may have corrected a marker and pressed Verify again.
+                string startMarker = EffectiveStartMarker;
+                string endMarker = EffectiveEndMarker;
+
                 ChangeVerificationResult result = await Task.Run(() =>
                 {
                     IList<string> lines = DocxTextReader.ReadLines(documentPath);
-                    IList<DocumentedFile> documented = ChangeDocumentParser.Parse(lines);
+                    IList<DocumentedFile> documented = ChangeDocumentParser.Parse(lines, startMarker, endMarker);
 
                     var comparer = new FolderComparer(
                         IgnoreBuildOutput ? FolderComparer.DefaultIgnoredFolders : Array.Empty<string>());
