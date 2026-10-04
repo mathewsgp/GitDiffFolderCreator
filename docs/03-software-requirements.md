@@ -118,7 +118,7 @@ Requirement IDs use `SR-nn`. "MUST" levels are release-blocking.
 | Metric | Value |
 | --- | --- |
 | Compiler warnings | 0 |
-| Automated tests | 388, all passing |
+| Automated tests | 395, all passing |
 | Test project | xUnit 2.9.2, .NET Framework 4.7.2 |
 | Application framework | .NET Framework 4.6.1 |
 | Third-party runtime dependencies | none |

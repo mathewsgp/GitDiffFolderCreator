@@ -203,6 +203,188 @@ public sealed class ChangeDocumentMarkerTests
         Assert.Empty(documented);
     }
 
+    // ------------------------------------------------------------------ more than one section
+
+    /// <summary>
+    /// A document may repeat the section, and every one of them is part of the list.
+    /// </summary>
+    /// <remarks>
+    /// Per module, per phase, per developer: a long change gets a section each time rather than one
+    /// section the length of a page. Reading only the first would report every file in the second as a
+    /// real change the document never mentioned — the checker's noisiest possible failure, and one that
+    /// looks like the document being wrong.
+    /// </remarks>
+    [Fact]
+    public void Every_section_the_markers_bound_is_read()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
+        {
+            "[Modified Files]",
+            Bullet + " src/Parser.cs",
+            "[Status]",
+            "Passed",
+            "[Modified Files]",
+            Bullet + " src/Reader.cs",
+            Bullet + " src/Writer.cs",
+            "[Status]",
+            "Passed",
+        });
+
+        Assert.Equal(
+            new[] { "src/Parser.cs", "src/Reader.cs", "src/Writer.cs" },
+            documented.Select(file => file.Path));
+    }
+
+    [Fact]
+    public void The_lines_in_a_later_section_report_their_own_line_numbers()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
+        {
+            "[Modified Files]",
+            Bullet + " src/Parser.cs",
+            "[Status]",
+            "[Modified Files]",
+            Bullet + " src/Reader.cs",
+            "[Status]",
+        });
+
+        // A finding quotes the line the claim came from, and line 5 is not line 2 however they were found.
+        Assert.Equal(5, documented.Single(file => file.Path == "src/Reader.cs").LineNumber);
+    }
+
+    /// <summary>
+    /// What sits between two sections belongs to neither of them.
+    /// </summary>
+    /// <remarks>
+    /// The closing heading is the end of one section, not the end of the document: prose, a summary table
+    /// and a list of files for a later phase all sit between two sections in a real document, and none of
+    /// them is part of the list.
+    /// </remarks>
+    [Fact]
+    public void Content_between_two_sections_is_not_part_of_either()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
+        {
+            "[Modified Files]",
+            Bullet + " src/Parser.cs",
+            "[Status]",
+            "Files planned for the next phase:",
+            "src/NotYetTouched.cs",
+            "[Modified Files]",
+            Bullet + " src/Reader.cs",
+            "[Status]",
+        });
+
+        Assert.Equal(
+            new[] { "src/Parser.cs", "src/Reader.cs" },
+            documented.Select(file => file.Path));
+    }
+
+    // ------------------------------------------------------------------ headings that say more
+
+    /// <summary>
+    /// The heading may be followed by whatever the author wrote after it.
+    /// </summary>
+    /// <remarks>
+    /// A heading in a real document is rarely a bare word: it carries a colon, a count, the module or
+    /// phase it belongs to. Requiring the line to end at the marker would read all of those documents as
+    /// having no section at all, and "no section" is reported as agreement — the tool would pass a
+    /// document it never read.
+    /// <para>
+    /// The marker still has to be at the start of the line, which is what keeps the existing rule whole: a
+    /// sentence that mentions the heading half way along is not a heading.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void A_marker_line_may_carry_more_than_the_marker()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
+        {
+            "[Modified Files] - 3 files changed:",
+            Bullet + " src/Parser.cs",
+            "[Status] - 2 of 2 passed",
+            "[Modified Files] (Module 2)",
+            Bullet + " src/Reader.cs",
+            "[Status]: green",
+        });
+
+        Assert.Equal(
+            new[] { "src/Parser.cs", "src/Reader.cs" },
+            documented.Select(file => file.Path));
+    }
+
+    [Fact]
+    public void A_closing_marker_with_more_after_it_still_closes_the_section()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
+        {
+            "[Modified Files]",
+            Bullet + " src/Parser.cs",
+            "[Status] - all green",
+            "Files touched in a later phase:",
+            "src/NotInThisPhase.cs",
+        });
+
+        // Otherwise the list would run on past the heading and take the next phase's files with it.
+        Assert.Equal("src/Parser.cs", Assert.Single(documented).Path);
+    }
+
+    [Fact]
+    public void A_marker_named_mid_sentence_is_still_not_a_heading_however_much_follows_it()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(
+            new[]
+            {
+                "The Modified Files section below lists one path, and nothing else does.",
+                "src/NotTheList.cs",
+                "[Status]",
+            },
+            startMarker: "Modified Files",
+            endMarker: "[Status]");
+
+        // The rule that was already there, and the reason the test above can exist: what is allowed to
+        // follow the marker is anything, but the marker itself has to come first.
+        Assert.Empty(documented);
+    }
+
+    [Fact]
+    public async Task The_check_reads_every_section_and_every_extra_word_on_a_heading()
+    {
+        using TempDirectory root = new();
+        (string baseFolder, string modifiedFolder) = Tree(root);
+
+        Write(modifiedFolder, "src/Edited.cs", "after");
+        Write(modifiedFolder, "src/Added.cs", "new");
+
+        // Both behaviours of the heading at once, against a real package: two sections, neither heading
+        // written bare, and a paragraph between them that is not part of either.
+        ChangeDocumentViewModel model = New(root.PathFor("settings.json"));
+        model.BaseFolder = baseFolder;
+        model.ModifiedFolder = modifiedFolder;
+        model.DocumentPath = TempDocx.Create(
+            root.PathFor("changes.docx"),
+            new[]
+            {
+                "Change summary",
+                "[Modified Files] - Module 1:",
+                Bullet + " src/Edited.cs",
+                "[Status] - 1 of 1 passed",
+                "Planned for the next phase:",
+                "src/SomethingElse.cs",
+                "[Modified Files] - Module 2:",
+                Bullet + " src/Added.cs",
+                "[Status]: green",
+            });
+
+        await model.VerifyAsync();
+
+        // Every real change is accounted for across both sections. Reading only the first would report
+        // src/Added.cs as undocumented, and the planned file would be read as a claim about a file that
+        // does not exist.
+        Assert.True(model.VerdictIsGood);
+        Assert.Empty(model.Findings);
+    }
+
     // ------------------------------------------------------------------ the checker
 
     /// <summary>

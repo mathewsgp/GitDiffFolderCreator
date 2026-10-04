@@ -326,6 +326,16 @@ Type what your document actually writes. Case, the square brackets and a trailin
 both sides, so `## Files Changed` matches `## files changed:` and you do not have to copy the heading
 character for character. **Defaults** puts both back.
 
+**The heading does not have to be the whole line.** It only has to be at the *start* of it, so
+`[Status] - all green`, `[Modified Files] (Module 2):` and `[Modified Files]: 3 files changed` are all
+recognised. A sentence that mentions the words further along — "the Modified Files section below
+lists…" — is still not a heading, and does not open the section.
+
+**The section may appear more than once.** Every section the two markers bound is read, so a document
+written as one list per module or per phase is checked in full rather than only in its first part.
+Whatever sits *between* two sections belongs to neither — a summary table, or a list of files planned
+for a later phase, is not read.
+
 Two details worth knowing:
 
 - **A blank box means the default**, not "no marker". Clearing the box is treated as "I did not mean to

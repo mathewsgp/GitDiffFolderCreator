@@ -122,7 +122,7 @@ namespace GitDiffFolderCreator.Services
         }
 
         /// <summary>
-        /// The documented paths between the two headings the reader named.
+        /// The documented paths between the two headings the reader named, in every section they bound.
         /// </summary>
         /// <remarks>
         /// A blank marker names no heading: a blank opening one reads as nothing at all, and a blank
@@ -153,15 +153,20 @@ namespace GitDiffFolderCreator.Services
 
                 if (start != null && IsHeading(line, start))
                 {
+                    // Opening, not "the first one". A document may repeat the section — one per module,
+                    // one per phase — and the paths in the second are as much part of the list as the
+                    // first's; reading only the first would report every file in the second as a change
+                    // nobody documented.
                     inSection = true;
                     continue;
                 }
 
                 if (inSection && end != null && IsHeading(line, end))
                 {
-                    // Everything past the closing heading is a different section: a status table, a
-                    // test plan, a list of files for a later phase.
-                    break;
+                    // Closing, not finishing: whatever comes between this and the next opening heading is
+                    // another section, and the scan carries on to reach it.
+                    inSection = false;
+                    continue;
                 }
 
                 if (!inSection || string.IsNullOrWhiteSpace(line))
@@ -179,38 +184,49 @@ namespace GitDiffFolderCreator.Services
         }
 
         /// <summary>
-        /// Whether a line is the named heading, with or without the brackets and the colon an author
-        /// may have typed around it.
+        /// Whether a line is the named heading, with or without the brackets and the colon an author may
+        /// have typed around it, and with or without whatever they wrote after it.
         /// </summary>
         /// <remarks>
-        /// The whole line, compared rather than searched for. <c>[Modified Files]</c>,
-        /// <c>[Modified Files]:</c> and <c>Modified Files</c> are all the same heading, while
-        /// "the Modified Files section lists…" is a sentence that happens to contain one, and treating
-        /// that as the heading would open the section in the wrong place.
+        /// The heading has to be at the <em>start</em> of the line, which is what keeps
+        /// "the Modified Files section lists…" — a sentence that happens to contain the words — from
+        /// opening the section in the wrong place. What follows the heading is not compared: an author
+        /// who writes <c>[Status] - all green</c> has written the heading, and requiring the line to end
+        /// there would read their document as having no section in it at all.
         /// </remarks>
         private static bool IsHeading(string? line, string key)
         {
-            return string.Equals(HeadingKey(line), key, StringComparison.OrdinalIgnoreCase);
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return false;
+            }
+
+            // Only the leading punctuation is stripped. Trailing brackets belong to whatever the author
+            // wrote after the heading — "Modified Files]" is the heading followed by a closing bracket,
+            // not the heading written twice.
+            string text = line!.Trim().TrimStart('[', ']', ':', ' ').Trim();
+
+            return text.StartsWith(key, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
-        /// Puts a heading into the one form two headings are compared in, or answers null for anything
-        /// that is not one.
+        /// Puts a configured marker into the one form a line is compared against, or answers null for
+        /// anything that is not a heading.
         /// </summary>
         /// <remarks>
-        /// Applied to the configured marker as well as to the line, which is what lets the marker be typed
-        /// the way the document spells it — with or without brackets, with or without the trailing colon
-        /// — without the two having to agree on which of those it is. A marker of nothing but brackets
-        /// or a colon is not a heading and is refused here rather than matching some unrelated line.
+        /// Both ends are stripped, because the marker is typed once in a box rather than in a document:
+        /// <c>[Modified Files]</c> and <c>Modified Files:</c> are one heading written two ways. A marker
+        /// of nothing but brackets or a colon is not a heading and is refused here rather than matching
+        /// whatever line begins with punctuation.
         /// </remarks>
-        private static string? HeadingKey(string? heading)
+        private static string? HeadingKey(string? marker)
         {
-            if (string.IsNullOrWhiteSpace(heading))
+            if (string.IsNullOrWhiteSpace(marker))
             {
                 return null;
             }
 
-            string key = heading!.Trim().Trim('[', ']', ':', ' ').Trim();
+            string key = marker!.Trim().Trim('[', ']', ':', ' ').Trim();
 
             return key.Length == 0 ? null : key;
         }

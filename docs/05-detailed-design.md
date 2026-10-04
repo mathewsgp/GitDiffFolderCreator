@@ -742,10 +742,11 @@ kind that only the reader can rule out.
 
 Two decisions make the setting usable rather than a spelling test:
 
-- **the same normalisation is applied to the marker as to the line**, so brackets, a trailing colon and
-  case are incidental on both sides. The marker is typed once, in settings, and the document is typed
-  again every time it is written; requiring an exact match would mean the setting fails whenever the
-  author capitalises a heading differently;
+- **the heading only has to be at the start of the line**, and nothing after it is compared. An author
+  who writes `[Status] - all green` has written the heading, and requiring the line to end at the
+  marker would read the document as having no section in it — which is reported as agreement, so the
+  tool would pass a document it never read. What keeps this from swallowing prose is the *start* rule:
+  "the Modified Files section below lists…" mentions the marker half way along and is not a heading;
 - **a blank marker means the default, not "no marker"**. A blank opening marker would read nothing, and
   a blank closing marker would run the list to the end of the document — both are answers rather than
   failures in the parser, but neither is what somebody who cleared a box meant, so the settings layer
@@ -753,6 +754,15 @@ Two decisions make the setting usable rather than a spelling test:
 
 The parser takes the two markers as parameters and holds no state, so the default pair is a one-line
 overload rather than a branch inside the scan.
+
+**A document may repeat the section, and every repeat is read.** The closing heading sets `inSection`
+back to false rather than ending the scan, so the parser goes on to the next opening heading. A long
+change is commonly written as one section per module or per phase, and reading only the first reports
+every file in the second as a real change the document never mentioned — the checker's noisiest failure,
+and one that looks like the document being at fault. What sits *between* two sections — a summary
+table, prose, the list of files planned for a later phase — belongs to neither, because the two headings
+bound the section and there is no section there. Each finding still quotes the line its claim came from,
+so a claim in the second section points at the second section rather than at line 2 of the document.
 
 Inside the section, one rule: **a run carrying a slash is a path.** Blank lines and lines of
 commentary are skipped and the list carries on, because the section — not the first line without a
@@ -867,7 +877,7 @@ screen-reader user gets it, so nothing was lost but the width.
 
 ## 5.9 Test architecture
 
-388 tests across 30 files, all against the real behaviour.
+395 tests across 30 files, all against the real behaviour.
 
 | Category | Approach |
 | --- | --- |
