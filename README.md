@@ -243,7 +243,8 @@ the "Root cause" and "Fix" paragraphs, any example list earlier on - cannot turn
  Passed
 ```
 
-The headings may be written `[Modified Files]` or plain `Modified Files`, with or without the colon, and
+With the default markers, the headings may be written `[Modified Files]` or plain `Modified Files`, with
+or without the colon, and
 they only have to be at the start of the line - `[Status] - all green` and `[Modified Files] (Module 2):`
 are recognised. Inside the section, numbering and bullets are optional, blank lines and commentary are
 skipped without ending the list, two paths may share a line, and every path must contain a `/` or a `\` -
@@ -253,11 +254,11 @@ between two sections belongs to neither.
 
 **CHANGED FILES START MARKER** and **CHANGED FILES END MARKER** name those two headings, so a document
 that does not use `Modified Files` and `Status` can still be read - type what your document actually
-says, brackets, colon and all. Case and the brackets are ignored, so the marker points at a heading
-rather than spelling it; **Defaults** puts `[Modified Files]` and `[Status]` back. A marker left blank
-means the default rather than no marker, because a reader who clears a box has not asked for a document
-that cannot be read. The two are remembered between sessions, so nobody has to name their own headings
-twice.
+says. The marker is used exactly as typed, brackets, colon and all, less the whitespace around it; case
+is ignored and the heading only has to be at the start of the line. **Defaults** puts `[Modified Files]`
+and `[Status]` back. A marker left blank means the default rather than no marker, because a reader who
+clears a box has not asked for a document that cannot be read. The two are remembered between sessions,
+so nobody has to name their own headings twice.
 
 Both sides of a comparison are normalised the same way: separators unified to `/`, surrounding
 whitespace and slashes trimmed, a leading `./` dropped. Matching then reads each claim **from the

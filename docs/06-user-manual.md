@@ -307,10 +307,10 @@ The list is read from one section, bounded by two headings:
  Passed
 ```
 
-The headings may be written `[Modified Files]` or plain `Modified Files`, with or without the colon.
-Everything between `[Modified Files]` and `[Status]` is read as the list; everything outside it is
-ignored, so the "Root cause" and "Fix" paragraphs — and any example list earlier in the document —
-cannot turn into findings.
+With the default markers, the headings may be written `[Modified Files]` or plain `Modified Files`, with
+or without the colon. Everything between `[Modified Files]` and `[Status]` is read as the list;
+everything outside it is ignored, so the "Root cause" and "Fix" paragraphs — and any example list
+earlier in the document — cannot turn into findings.
 
 ### If your document names its sections differently
 
@@ -322,14 +322,16 @@ document path name them:
 | **CHANGED FILES START MARKER** | `[Modified Files]` | the heading the list starts at |
 | **CHANGED FILES END MARKER** | `[Status]` | the heading the list ends at |
 
-Type what your document actually writes. Case, the square brackets and a trailing colon are ignored on
-both sides, so `## Files Changed` matches `## files changed:` and you do not have to copy the heading
-character for character. **Defaults** puts both back.
+Type what your document actually writes. **The marker is used exactly as you typed it** — nothing is
+taken off it except the whitespace around it, so the brackets and the colon are matched as characters
+and come back unchanged the next time you open the window. Case is ignored, and a heading only has to
+be at the *start* of the line, so `[Status] - all green` and `[Modified Files] (Module 2):` are
+recognised while "the Modified Files section below lists…" is still not a heading. **Defaults** puts both
+back.
 
-**The heading does not have to be the whole line.** It only has to be at the *start* of it, so
-`[Status] - all green`, `[Modified Files] (Module 2):` and `[Modified Files]: 3 files changed` are all
-recognised. A sentence that mentions the words further along — "the Modified Files section below
-lists…" — is still not a heading, and does not open the section.
+One exception, in your favour: the default `[Modified Files]` also finds a document that writes the same
+heading as `Modified Files`. That second spelling is worked out from your marker rather than by editing
+it, so a marker that genuinely needs its brackets is still matched with them.
 
 **The section may appear more than once.** Every section the two markers bound is read, so a document
 written as one list per module or per phase is checked in full rather than only in its first part.

@@ -153,8 +153,8 @@ namespace GitDiffFolderCreator.Services
                 return found;
             }
 
-            string? start = HeadingKey(startMarker);
-            string? end = HeadingKey(endMarker);
+            Heading? start = Heading.From(startMarker);
+            Heading? end = Heading.From(endMarker);
 
             bool inSection = false;
             int number = 0;
@@ -164,7 +164,7 @@ namespace GitDiffFolderCreator.Services
             {
                 number++;
 
-                if (start != null && IsHeading(line, start))
+                if (start != null && start.Matches(line))
                 {
                     // Opening, not "the first one". A document may repeat the section — one per module,
                     // one per phase — and the paths in the second are as much part of the list as the
@@ -176,7 +176,7 @@ namespace GitDiffFolderCreator.Services
                     continue;
                 }
 
-                if (inSection && end != null && IsHeading(line, end))
+                if (inSection && end != null && end.Matches(line))
                 {
                     // Closing, not finishing: whatever comes between this and the next opening heading is
                     // another section, and the scan carries on to reach it.
@@ -199,51 +199,80 @@ namespace GitDiffFolderCreator.Services
         }
 
         /// <summary>
-        /// Whether a line is the named heading, with or without the brackets and the colon an author may
-        /// have typed around it, and with or without whatever they wrote after it.
+        /// One configured marker, held exactly as it was typed.
         /// </summary>
         /// <remarks>
-        /// The heading has to be at the <em>start</em> of the line, which is what keeps
-        /// "the Modified Files section lists…" — a sentence that happens to contain the words — from
-        /// opening the section in the wrong place. What follows the heading is not compared: an author
-        /// who writes <c>[Status] - all green</c> has written the heading, and requiring the line to end
-        /// there would read their document as having no section in it at all.
+        /// Nothing is taken off it except the whitespace around it — not the brackets, not a colon, not
+        /// any other character somebody deliberately put there. A marker is a setting a reader typed and
+        /// expects to find again unchanged, and rewriting it behind their back is how a marker ends up
+        /// naming something other than what they wrote.
+        /// <para>
+        /// Alongside it is a second form, <em>derived</em> rather than edited, with the brackets and colons
+        /// an author may put around a heading taken off the ends. Matching tries the typed text against
+        /// the line first and only falls back to that, so the default <c>[Modified Files]</c> still finds
+        /// a document that writes <c>Modified Files</c> — without the setting itself being changed to do
+        /// it, and without a marker of nothing but brackets quietly becoming no marker at all.
+        /// </para>
         /// </remarks>
-        private static bool IsHeading(string? line, string key)
+        private sealed class Heading
         {
-            if (string.IsNullOrWhiteSpace(line))
+            private Heading(string exact, string unbracketed)
             {
-                return false;
+                Exact = exact;
+                Unbracketed = unbracketed;
             }
 
-            // Only the leading punctuation is stripped. Trailing brackets belong to whatever the author
-            // wrote after the heading — "Modified Files]" is the heading followed by a closing bracket,
-            // not the heading written twice.
-            string text = line!.Trim().TrimStart('[', ']', ':', ' ').Trim();
+            /// <summary>The marker as typed, less the whitespace around it.</summary>
+            public string Exact { get; }
 
-            return text.StartsWith(key, StringComparison.OrdinalIgnoreCase);
-        }
+            /// <summary>The same heading with the brackets and colons taken off both ends.</summary>
+            public string Unbracketed { get; }
 
-        /// <summary>
-        /// Puts a configured marker into the one form a line is compared against, or answers null for
-        /// anything that is not a heading.
-        /// </summary>
-        /// <remarks>
-        /// Both ends are stripped, because the marker is typed once in a box rather than in a document:
-        /// <c>[Modified Files]</c> and <c>Modified Files:</c> are one heading written two ways. A marker
-        /// of nothing but brackets or a colon is not a heading and is refused here rather than matching
-        /// whatever line begins with punctuation.
-        /// </remarks>
-        private static string? HeadingKey(string? marker)
-        {
-            if (string.IsNullOrWhiteSpace(marker))
+            /// <summary>The marker, or null when there is nothing to look for.</summary>
+            public static Heading? From(string? marker)
             {
-                return null;
+                string exact = (marker ?? string.Empty).Trim();
+
+                return exact.Length == 0
+                    ? null
+                    : new Heading(exact, exact.Trim('[', ']', ':', ' ').Trim());
             }
 
-            string key = marker!.Trim().Trim('[', ']', ':', ' ').Trim();
+            /// <summary>
+            /// Whether a line is this heading, with or without whatever the author wrote after it.
+            /// </summary>
+            /// <remarks>
+            /// The heading has to be at the <em>start</em> of the line, which is what keeps "the Modified
+            /// Files section lists…" — a sentence that happens to contain the words — from opening the
+            /// section in the wrong place. What follows it is not compared: an author who writes
+            /// <c>[Status] - all green</c> has written the heading, and requiring the line to end there
+            /// would read their document as having no section in it.
+            /// </remarks>
+            public bool Matches(string? line)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    return false;
+                }
 
-            return key.Length == 0 ? null : key;
+                string typed = line!.Trim();
+
+                if (StartsWith(typed, Exact))
+                {
+                    return true;
+                }
+
+                // Only for the fallback, and only off the front: a trailing bracket belongs to whatever
+                // the author wrote after the heading.
+                string bare = typed.TrimStart('[', ']', ':', ' ').Trim();
+
+                return StartsWith(bare, Unbracketed);
+            }
+
+            private static bool StartsWith(string text, string prefix)
+            {
+                return prefix.Length > 0 && text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         /// <summary>Every path on one line, in the order they appear.</summary>

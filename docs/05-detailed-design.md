@@ -742,11 +742,18 @@ kind that only the reader can rule out.
 
 Two decisions make the setting usable rather than a spelling test:
 
+- **the typed marker is what is compared, and nothing is taken off it but the whitespace around it.**
+  Every character in a marker is there on purpose, and rewriting it behind the reader's back is how a
+  marker ends up naming something other than what they wrote — trimming `[`, `]` and `:` off the ends
+  made a marker of nothing but brackets name no heading at all. The tolerance is kept as a *derived*
+  second form: matching tries the marker as typed against the line, and only falls back to the same
+  heading with the brackets and colons taken off the ends. So the default `[Modified Files]` still finds
+  a document that writes `Modified Files`, and the setting itself is never edited to do it;
 - **the heading only has to be at the start of the line**, and nothing after it is compared. An author
-  who writes `[Status] - all green` has written the heading, and requiring the line to end at the
-  marker would read the document as having no section in it — which is reported as agreement, so the
-  tool would pass a document it never read. What keeps this from swallowing prose is the *start* rule:
-  "the Modified Files section below lists…" mentions the marker half way along and is not a heading;
+  who writes `[Status] - all green` has written the heading, and requiring the line to end at the marker
+  would read the document as having no section — which is reported as agreement, so the tool would pass a
+  document it never read. What keeps this from swallowing prose is the *start* rule: "the Modified Files
+  section below lists…" mentions the marker half way along and is not a heading;
 - **a blank marker means the default, not "no marker"**. A blank opening marker would read nothing, and
   a blank closing marker would run the list to the end of the document — both are answers rather than
   failures in the parser, but neither is what somebody who cleared a box meant, so the settings layer
@@ -887,7 +894,7 @@ screen-reader user gets it, so nothing was lost but the width.
 
 ## 5.9 Test architecture
 
-399 tests across 30 files, all against the real behaviour.
+404 tests across 30 files, all against the real behaviour.
 
 | Category | Approach |
 | --- | --- |

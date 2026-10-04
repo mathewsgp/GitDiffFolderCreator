@@ -90,6 +90,33 @@ public sealed class ChangeDocumentMarkerTests
         Assert.Equal("## Verification", loaded.ChangedFilesEndMarker);
     }
 
+    /// <summary>
+    /// What the reader typed is what comes back, character for character.
+    /// </summary>
+    /// <remarks>
+    /// The brackets and the colon are the ones a reader is most likely to have typed deliberately, and
+    /// they are exactly what used to be trimmed on the way in. Only the whitespace around the marker is
+    /// not part of it.
+    /// </remarks>
+    [Theory]
+    [InlineData("[Modified Files]:")]
+    [InlineData(":: [Src] Files ::")]
+    [InlineData("  [Modified Files]  ")]
+    public void The_stored_marker_is_what_was_typed(string typed)
+    {
+        using TempDirectory folder = new();
+        string settingsPath = folder.PathFor("settings.json");
+
+        ChangeDocumentViewModel model = New(settingsPath);
+        model.ChangedFilesStartMarker = typed;
+
+        AppSettings settings = new AppSettingsStore(settingsPath).Load();
+
+        // The surrounding whitespace is the only thing dropped, and the box shows the same thing.
+        Assert.Equal(typed.Trim(), settings.ChangedFilesStartMarker);
+        Assert.Equal(typed.Trim(), New(settingsPath).ChangedFilesStartMarker);
+    }
+
     // ------------------------------------------------------------------ the parser
 
     /// <summary>
@@ -190,17 +217,70 @@ public sealed class ChangeDocumentMarkerTests
         Assert.Equal(new[] { "src/Parser.cs" }, documented.Select(file => file.Path));
     }
 
+    /// <summary>
+    /// Nothing is taken off a marker but the whitespace around it.
+    /// </summary>
+    /// <remarks>
+    /// A marker is a setting somebody typed, and every character in it is there on purpose — so a marker
+    /// of nothing but brackets used to be trimmed to nothing and name no heading at all, which reads to
+    /// the person who set it as though their setting had been ignored.
+    /// </remarks>
     [Fact]
-    public void A_marker_that_is_nothing_but_brackets_and_a_colon_names_no_heading()
+    public void A_marker_made_only_of_characters_that_used_to_be_trimmed_is_still_a_marker()
     {
         IList<DocumentedFile> documented = ChangeDocumentParser.Parse(
-            new[] { "[]:", "src/Parser.cs", "[Status]", "Passed" },
+            new[] { "[]: 2 files", Bullet + " src/Parser.cs", "[Status]", "Passed" },
             startMarker: "[]",
             endMarker: "[Status]");
 
-        // Stripped to nothing, this marker would otherwise match any line that is only punctuation and
-        // open the section in the wrong place.
-        Assert.Empty(documented);
+        Assert.Equal("src/Parser.cs", Assert.Single(documented).Path);
+    }
+
+    /// <summary>
+    /// The typed marker is what is compared, before anything is taken off either side.
+    /// </summary>
+    /// <remarks>
+    /// The brackets here are part of the heading rather than decoration around it — this document does
+    /// not also write the heading without them, and the marker was not going to be rewritten into one
+    /// that did.
+    /// </remarks>
+    [Fact]
+    public void A_heading_whose_brackets_are_part_of_it_is_matched_with_them()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(
+            new[]
+            {
+                "[Src] Modified Files",
+                Bullet + " src/Parser.cs",
+                "[Status]",
+                "Passed",
+            },
+            startMarker: "[Src] Modified Files",
+            endMarker: "[Status]");
+
+        Assert.Equal("src/Parser.cs", Assert.Single(documented).Path);
+    }
+
+    /// <summary>
+    /// The default bracketed marker still finds the same heading written without them.
+    /// </summary>
+    /// <remarks>
+    /// Which is the reason the derived form exists at all: <c>[Modified Files]</c> is the default, and
+    /// plenty of documents write <c>Modified Files</c>. That tolerance is a second form computed from
+    /// the marker, never a change to the marker.
+    /// </remarks>
+    [Fact]
+    public void The_default_marker_still_finds_the_heading_written_without_brackets()
+    {
+        IList<DocumentedFile> documented = ChangeDocumentParser.Parse(new[]
+        {
+            "Modified Files:",
+            Bullet + " src/Parser.cs",
+            "Status",
+            "Passed",
+        });
+
+        Assert.Equal("src/Parser.cs", Assert.Single(documented).Path);
     }
 
     // ------------------------------------------------------------------ more than one section
