@@ -99,8 +99,17 @@ public sealed class ChangeDocumentVerifierTests
             .Differences.Count);
     }
 
+    /// <summary>
+    /// A moved file is a deletion and an addition, and the checker leaves it as two changes.
+    /// </summary>
+    /// <remarks>
+    /// The comparison reports what is there: the old path is gone and the new one is here. Pairing them
+    /// by content would be reading the document on the reader's behalf — a document that names only the
+    /// new path has, on this reading, not declared the deletion, and that is a fact worth reporting
+    /// rather than one to smooth over.
+    /// </remarks>
     [Fact]
-    public void A_file_moved_unchanged_is_one_change_and_not_a_deletion_plus_an_addition()
+    public void A_file_moved_unchanged_is_a_deletion_and_an_addition_in_the_checker()
     {
         using TempDirectory root = new();
         (string baseFolder, string modifiedFolder) = MakePair(root);
@@ -112,12 +121,34 @@ public sealed class ChangeDocumentVerifierTests
             Path.Combine(modifiedFolder, "src", "Old.cs"),
             Path.Combine(modifiedFolder, "src", "New.cs"));
 
-        FolderComparison comparison = new FolderComparer().Compare(baseFolder, modifiedFolder);
+        ChangeVerificationResult result = Verify(baseFolder, modifiedFolder, "src/New.cs");
 
-        FolderMove move = Assert.Single(comparison.Moves());
+        Assert.Equal(1, result.Matches);
 
-        Assert.Equal("src/Old.cs", move.FromPath);
-        Assert.Equal("src/New.cs", move.ToPath);
+        // The new path is documented, so the only thing left is the old one.
+        ChangeFinding finding = Assert.Single(result.Findings);
+
+        Assert.Equal(ChangeFindingKind.OnlyInBase, finding.Kind);
+        Assert.Equal("src/Old.cs", finding.ActualPath);
+    }
+
+    [Fact]
+    public void A_move_the_document_lists_neither_side_of_is_both_an_addition_and_a_deletion()
+    {
+        using TempDirectory root = new();
+        (string baseFolder, string modifiedFolder) = MakePair(root);
+
+        File.Move(
+            Path.Combine(modifiedFolder, "src", "Old.cs"),
+            Path.Combine(modifiedFolder, "src", "New.cs"));
+
+        ChangeVerificationResult result = Verify(baseFolder, modifiedFolder);
+
+        Assert.Equal(2, result.Findings.Count);
+        Assert.Contains(result.Findings, f => f.Kind == ChangeFindingKind.OnlyInBase
+            && f.ActualPath == "src/Old.cs");
+        Assert.Contains(result.Findings, f => f.Kind == ChangeFindingKind.OnlyInModified
+            && f.ActualPath == "src/New.cs");
     }
 
     [Fact]
@@ -210,8 +241,16 @@ public sealed class ChangeDocumentVerifierTests
     /// documented correctly, and telling the reader it was "moved instead" would be the tool inventing a
     /// category the document never claimed.
     /// </remarks>
+    /// <summary>
+    /// A move is two changes here, and a document naming only the new path has left one of them out.
+    /// </summary>
+    /// <remarks>
+    /// Not one change: the checker sees a deletion at the old path and an addition at the new one, which
+    /// is what the two folders actually contain. The document names one file, so the other path is an
+    /// undeclared change and is reported as such.
+    /// </remarks>
     [Fact]
-    public void A_file_that_moved_and_is_listed_where_it_now_lives_agrees()
+    public void A_file_that_moved_and_is_listed_where_it_now_lives_leaves_the_old_path_undeclared()
     {
         using TempDirectory root = new();
         Fixture fixture = MovedFile(root);
@@ -219,57 +258,36 @@ public sealed class ChangeDocumentVerifierTests
         ChangeVerificationResult result = Verify(fixture, "src/New.cs");
 
         Assert.Equal(1, result.Matches);
-        Assert.Empty(result.Findings);
+
+        ChangeFinding finding = Assert.Single(result.Findings);
+
+        Assert.Equal(ChangeFindingKind.OnlyInBase, finding.Kind);
+        Assert.Equal("src/Old.cs", finding.ActualPath);
     }
 
     /// <summary>
-    /// The same file listed at the path it no longer has is reported on its own account.
+    /// A move named at the path it no longer has documents the deletion and nothing else.
     /// </summary>
     /// <remarks>
-    /// Two plain statements rather than one that explains the move: the listed path is not in the
-    /// modified source, and the file that did change is one this document did not list. Neither says
-    /// anything about what the document meant to categorise, and between them they lose nothing the
-    /// reader needs to fix the document.
+    /// The listed path is a real change — the file is gone from the modified source — so the claim
+    /// matches it rather than being called a path that does not exist. What the document did not name is
+    /// the new path, and that is the one finding left.
     /// </remarks>
     [Fact]
-    public void A_moved_file_listed_at_the_path_it_no_longer_has_is_reported_as_not_present()
+    public void A_moved_file_listed_at_the_path_it_no_longer_has_documents_the_deletion()
     {
         using TempDirectory root = new();
         Fixture fixture = MovedFile(root);
 
         ChangeVerificationResult result = Verify(fixture, "src/Old.cs");
 
-        ChangeFinding listed = Assert.Single(
-            result.Findings,
-            f => f.Kind == ChangeFindingKind.DocumentedButAbsent);
-
-        Assert.Equal("src/Old.cs", listed.DisplayPath);
-
-        ChangeFinding unlisted = Assert.Single(
-            result.Findings,
-            f => f.Kind == ChangeFindingKind.OnlyInModified);
-
-        Assert.Equal("src/New.cs", unlisted.ActualPath);
-    }
-
-    /// <summary>
-    /// A move is one change, and listing it correctly says everything there is to say.
-    /// </summary>
-    /// <remarks>
-    /// Not a deletion and an addition, and not a category the document never claimed either: a move is
-    /// one change under its new path, and a document listing that path is correct. Three findings for one
-    /// renamed file would bury it, and one finding would be reporting something nobody got wrong.
-    /// </remarks>
-    [Fact]
-    public void A_moved_file_that_the_document_lists_at_its_new_path_is_one_change_and_no_findings()
-    {
-        using TempDirectory root = new();
-        Fixture fixture = MovedFile(root);
-
-        ChangeVerificationResult result = Verify(fixture, "src/New.cs");
-
         Assert.Equal(1, result.Matches);
-        Assert.Empty(result.Findings);
+        Assert.DoesNotContain(result.Findings, f => f.Kind == ChangeFindingKind.DocumentedButAbsent);
+
+        ChangeFinding unlisted = Assert.Single(result.Findings);
+
+        Assert.Equal(ChangeFindingKind.OnlyInModified, unlisted.Kind);
+        Assert.Equal("src/New.cs", unlisted.ActualPath);
     }
 
     [Fact]

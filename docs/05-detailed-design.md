@@ -841,18 +841,16 @@ needs to see; the two trees sit at different absolute paths by definition, so an
 would name nothing. The roots are kept anyway, because a reported path has to be openable.
 
 A path present on both sides with different bytes is a difference; a path present on one side only is
-an addition or a removal. A file whose content is identical but whose path moved is reported as a
-**move** rather than as a deletion plus an addition — one change, one finding, and the document's
-`old -> new` arrow and the folder walk then agree with each other. Matching is on the content hash,
-so a move of a modified file is still a move.
+an addition or a removal. That is the whole of what the comparison reports, and a file whose content is
+identical but whose path moved is therefore **two changes** — a deletion at the old path and an addition
+at the new one. Pairing them by content would decide on the reader's behalf which single change the
+document was supposed to describe, and a document that names one file has named one change.
 
 **The cross-check says nothing about which sort of change was meant.** A change document lists changed
 files, not categories, so the verifier resolves a claim to the file it names and stops there. A move
-listed at its new path is a match and produces no finding: telling the reader that the document "says this
-file was modified" and was moved instead would be the tool attributing a category the document never
-claimed. A move listed at the path it no longer has is reported the same way as any other path that is not
-there — the listed path is absent, and the file that did change is not listed — which loses nothing the
-reader needs to fix the document and says nothing about intent.
+listed at its new path documents that path and leaves the old one undeclared, and a move listed at the old
+path documents the deletion and leaves the addition undeclared. Both are one finding, and both are what
+the two folders actually contain — no category is inferred, and no second reading of the list is taken.
 
 **Nothing is skipped.** The export's comparer excludes build output by default (`bin`, `obj`, `.vs`,
 `.git` and the rest) because a compiled assembly differs on every build and would drown the real changes.

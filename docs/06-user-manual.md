@@ -289,10 +289,11 @@ Press **Verify**. You get a verdict, the counts, and a list of everything the tw
 | Changed, not listed | A real change the document never mentions |
 | Added / Deleted, not listed | A file only in one of the two sources, unmentioned |
 
-A moved file is one change under its new path, so listing it there is simply correct. A change document
-lists changed files rather than categories, and nothing here tries to say which sort of change you meant.
-List it at the path it no longer has and you get two plain statements instead: that path is not in the
-modified source, and the file that did change was not listed.
+A moved file is reported as two changes, because that is what the two folders contain: a deletion at the
+path it no longer has and an addition at the path it now has. The document has to name both — one entry
+covers one change, and naming the new path alone leaves the deletion undeclared, or the other way round.
+A change document lists changed files rather than categories, so nothing here tries to say which sort of
+change you meant.
 
 ### How the document has to be written
 

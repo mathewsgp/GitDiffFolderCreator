@@ -179,32 +179,15 @@ namespace GitDiffFolderCreator.Services
 
             // What actually differs, keyed the way the document spells paths, so a claim is matched
             // against the difference it is claiming.
+            //
+            // A file that moved is not paired up with the file it was: it is a deletion at the old path
+            // and an addition at the new one, and both are taken at face value. A document that lists
+            // only one side of the move has then left the other side undeclared, which is the truth -
+            // pairing the two would decide on the reader's behalf which one they meant.
             var changed = new Dictionary<string, FolderDifference>(StringComparer.OrdinalIgnoreCase);
-            var movedFrom = new Dictionary<string, FolderMove>(StringComparer.OrdinalIgnoreCase);
-            var movedAway = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (FolderMove move in comparison.Moves())
-            {
-                movedFrom[move.ToPath] = move;
-                movedAway.Add(move.FromPath);
-            }
 
             foreach (FolderDifference difference in comparison.Differences)
             {
-                // A move is one change under its new name, which is the name a document would use.
-                if (difference.Kind == FolderDifferenceKind.Added && movedFrom.ContainsKey(difference.ModifiedPath!))
-                {
-                    changed[difference.ModifiedPath!] = difference;
-                    continue;
-                }
-
-                // The old side of a move is not an independent deletion, and reporting it as one
-                // would tell the reader to delete a file that still exists.
-                if (difference.Kind == FolderDifferenceKind.Removed && movedAway.Contains(difference.BasePath!))
-                {
-                    continue;
-                }
-
                 changed[difference.PrimaryPath] = difference;
             }
 
