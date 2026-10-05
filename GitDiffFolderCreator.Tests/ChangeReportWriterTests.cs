@@ -57,7 +57,7 @@ public sealed class ChangeReportWriterTests
     {
         ChangeVerificationResult result = Result(
             new ChangeFinding(
-                ChangeFindingKind.PathMismatch,
+                ChangeFindingKind.DocumentedButAbsent,
                 "src/a.cs",
                 "src/b.cs",
                 "It was called \"Old\" before."));

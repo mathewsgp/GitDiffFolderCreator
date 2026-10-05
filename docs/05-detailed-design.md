@@ -777,8 +777,7 @@ a file named in two of a document's lists — because a shared file belongs to b
 one section writes `src/Parser.cs` and the next writes `Parser.cs` — is that document being correct,
 and reporting it would fill the findings with complaints about a document with nothing wrong with it.
 Only two claims *inside one section* are the same claim made twice. A file matched in an earlier
-section is not matched again, so it is counted once in the totals and a move is reported once however
-many sections name it.
+section is not matched again, so it is counted once in the totals however many sections name it.
 
 Inside the section, one rule: **a run carrying a slash is a path.** Blank lines and lines of
 commentary are skipped and the list carries on, because the section — not the first line without a
@@ -845,6 +844,14 @@ an addition or a removal. A file whose content is identical but whose path moved
 **move** rather than as a deletion plus an addition — one change, one finding, and the document's
 `old -> new` arrow and the folder walk then agree with each other. Matching is on the content hash,
 so a move of a modified file is still a move.
+
+**The cross-check says nothing about which sort of change was meant.** A change document lists changed
+files, not categories, so the verifier resolves a claim to the file it names and stops there. A move
+listed at its new path is a match and produces no finding: telling the reader that the document "says this
+file was modified" and was moved instead would be the tool attributing a category the document never
+claimed. A move listed at the path it no longer has is reported the same way as any other path that is not
+there — the listed path is absent, and the file that did change is not listed — which loses nothing the
+reader needs to fix the document and says nothing about intent.
 
 **Build output is skipped by default** (`bin`, `obj`, `.vs`, `.git`, `.svn`, `.hg`, `node_modules`,
 `packages`, `TestResults`). These are source folders, and a compiled assembly differs on every build,

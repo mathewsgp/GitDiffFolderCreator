@@ -202,50 +202,74 @@ public sealed class ChangeDocumentVerifierTests
             && f.ActualPath == "src/Added.cs");
     }
 
+    /// <summary>
+    /// A moved file listed at the path it now has is a match, and nothing is said about the move.
+    /// </summary>
+    /// <remarks>
+    /// A change document lists changed files, not categories: a file listed where it now lives has been
+    /// documented correctly, and telling the reader it was "moved instead" would be the tool inventing a
+    /// category the document never claimed.
+    /// </remarks>
     [Fact]
-    public void A_file_that_moved_is_reported_as_a_wrong_path_when_documented_under_its_new_name()
+    public void A_file_that_moved_and_is_listed_where_it_now_lives_agrees()
     {
         using TempDirectory root = new();
         Fixture fixture = MovedFile(root);
 
         ChangeVerificationResult result = Verify(fixture, "src/New.cs");
 
-        ChangeFinding finding = Assert.Single(result.Findings);
-
-        Assert.Equal(ChangeFindingKind.PathMismatch, finding.Kind);
-        Assert.Equal("src/New.cs", finding.DocumentedPath);
-        Assert.Equal("src/New.cs", finding.ActualPath);
-        Assert.Contains("moved", finding.Detail);
+        Assert.Equal(1, result.Matches);
+        Assert.Empty(result.Findings);
     }
 
+    /// <summary>
+    /// The same file listed at the path it no longer has is reported on its own account.
+    /// </summary>
+    /// <remarks>
+    /// Two plain statements rather than one that explains the move: the listed path is not in the
+    /// modified source, and the file that did change is one this document did not list. Neither says
+    /// anything about what the document meant to categorise, and between them they lose nothing the
+    /// reader needs to fix the document.
+    /// </remarks>
     [Fact]
-    public void A_moved_file_documented_under_its_old_name_is_told_where_it_went()
+    public void A_moved_file_listed_at_the_path_it_no_longer_has_is_reported_as_not_present()
     {
         using TempDirectory root = new();
         Fixture fixture = MovedFile(root);
 
-        // What someone writes when they have not noticed the move. Reporting this as "no such file"
-        // would be true and useless.
         ChangeVerificationResult result = Verify(fixture, "src/Old.cs");
 
-        ChangeFinding finding = Assert.Single(result.Findings);
+        ChangeFinding listed = Assert.Single(
+            result.Findings,
+            f => f.Kind == ChangeFindingKind.DocumentedButAbsent);
 
-        Assert.Equal(ChangeFindingKind.PathMismatch, finding.Kind);
-        Assert.Equal("src/Old.cs", finding.DocumentedPath);
-        Assert.Equal("src/New.cs", finding.ActualPath);
-        Assert.Contains("no longer at src/Old.cs", finding.Detail);
+        Assert.Equal("src/Old.cs", listed.DisplayPath);
+
+        ChangeFinding unlisted = Assert.Single(
+            result.Findings,
+            f => f.Kind == ChangeFindingKind.OnlyInModified);
+
+        Assert.Equal("src/New.cs", unlisted.ActualPath);
     }
 
+    /// <summary>
+    /// A move is one change, and listing it correctly says everything there is to say.
+    /// </summary>
+    /// <remarks>
+    /// Not a deletion and an addition, and not a category the document never claimed either: a move is
+    /// one change under its new path, and a document listing that path is correct. Three findings for one
+    /// renamed file would bury it, and one finding would be reporting something nobody got wrong.
+    /// </remarks>
     [Fact]
-    public void A_moved_file_is_not_reported_as_a_deletion_and_an_addition_as_well()
+    public void A_moved_file_that_the_document_lists_at_its_new_path_is_one_change_and_no_findings()
     {
         using TempDirectory root = new();
         Fixture fixture = MovedFile(root);
 
-        // One move, one finding. Three findings for one renamed file would bury it.
         ChangeVerificationResult result = Verify(fixture, "src/New.cs");
 
-        Assert.Single(result.Findings);
+        Assert.Equal(1, result.Matches);
+        Assert.Empty(result.Findings);
     }
 
     [Fact]

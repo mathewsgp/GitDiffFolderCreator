@@ -284,12 +284,16 @@ Press **Verify**. You get a verdict, the counts, and a list of everything the tw
 | Finding | What it means |
 | --- | --- |
 | Listed twice | The same path appears twice **in one section** — a duplicated entry |
-| Wrong path | The file was **moved** rather than edited |
 | Listed, not present | The document names a file the modified source does not have |
 | Listed, not changed | The document claims an edit that is not there: both sources are identical |
 | Changed, not listed | A real change the document never mentions |
 | Added / Deleted, not listed | A file only in one of the two sources, unmentioned |
 | Not compared | The path is under `bin`, `obj` or similar and the check skipped it |
+
+A moved file is one change under its new path, so listing it there is simply correct. A change document
+lists changed files rather than categories, and nothing here tries to say which sort of change you meant.
+List it at the path it no longer has and you get two plain statements instead: that path is not in the
+modified source, and the file that did change was not listed.
 
 ### How the document has to be written
 

@@ -18,9 +18,6 @@ namespace GitDiffFolderCreator.Services
         /// <summary>The source differs, and the document does not mention it.</summary>
         MissingFromDocument,
 
-        /// <summary>It differs under a different path than the one documented.</summary>
-        PathMismatch,
-
         /// <summary>In the base folder and gone from the modified one.</summary>
         OnlyInBase,
 
@@ -78,9 +75,6 @@ namespace GitDiffFolderCreator.Services
 
                 case ChangeFindingKind.MissingFromDocument:
                     return "Changed, not listed";
-
-                case ChangeFindingKind.PathMismatch:
-                    return "Wrong path";
 
                 case ChangeFindingKind.OnlyInBase:
                     return "Deleted, not listed";
@@ -193,13 +187,11 @@ namespace GitDiffFolderCreator.Services
             // against the difference it is claiming.
             var changed = new Dictionary<string, FolderDifference>(StringComparer.OrdinalIgnoreCase);
             var movedFrom = new Dictionary<string, FolderMove>(StringComparer.OrdinalIgnoreCase);
-            var movedTo = new Dictionary<string, FolderMove>(StringComparer.OrdinalIgnoreCase);
             var movedAway = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (FolderMove move in comparison.Moves())
             {
                 movedFrom[move.ToPath] = move;
-                movedTo[move.FromPath] = move;
                 movedAway.Add(move.FromPath);
             }
 
@@ -252,7 +244,7 @@ namespace GitDiffFolderCreator.Services
                 // The claim as the document spells it. The comparison reads it from the right, so a
                 // document that wrote the path from part way down still names the file - what it got
                 // wrong at the front is dropped once the file is found.
-                string? key = Resolve(file.Path, changed.Keys) ?? Resolve(file.Path, movedTo.Keys);
+                string? key = Resolve(file.Path, changed.Keys);
 
                 if (key != null)
                 {
@@ -272,36 +264,11 @@ namespace GitDiffFolderCreator.Services
                     }
 
                     // A file already accounted for in an earlier section is left alone rather than
-                    // counted again: it is one change, and one move, however many sections name it.
+                    // counted again: it is one change, however many sections name it.
                     if (!matched.Contains(key))
                     {
                         matched.Add(key);
                         matches++;
-
-                        if (movedFrom.TryGetValue(key, out FolderMove? move))
-                        {
-                            matched.Add(move.FromPath);
-
-                            findings.Add(new ChangeFinding(
-                                ChangeFindingKind.PathMismatch,
-                                file.Path,
-                                move.ToPath,
-                                "The document says this file was modified. It was moved instead: the "
-                                    + "same content is at " + move.ToPath + " and no longer at "
-                                    + move.FromPath + "."));
-                        }
-                        else if (movedTo.TryGetValue(key, out FolderMove? otherWay))
-                        {
-                            matched.Add(otherWay.ToPath);
-
-                            findings.Add(new ChangeFinding(
-                                ChangeFindingKind.PathMismatch,
-                                file.Path,
-                                otherWay.ToPath,
-                                "The document says this file was modified. It was moved instead: the "
-                                    + "same content is at " + otherWay.ToPath + " and no longer at "
-                                    + otherWay.FromPath + "."));
-                        }
                     }
 
                     if (!matchedIn.TryGetValue(key, out Dictionary<int, int>? bySection))
@@ -312,7 +279,7 @@ namespace GitDiffFolderCreator.Services
 
                     bySection[file.Section] = file.LineNumber;
                 }
-                else if (!IsAccountedFor(matched, changed, movedTo, file))
+                else if (!IsAccountedFor(matched, changed, file))
                 {
                     findings.Add(DescribeUnmatchedClaim(file, comparison));
                 }
@@ -384,10 +351,9 @@ namespace GitDiffFolderCreator.Services
         private static bool IsAccountedFor(
             HashSet<string> matched,
             Dictionary<string, FolderDifference> changed,
-            Dictionary<string, FolderMove> movedTo,
             DocumentedFile file)
         {
-            string? key = Resolve(file.Path, changed.Keys) ?? Resolve(file.Path, movedTo.Keys);
+            string? key = Resolve(file.Path, changed.Keys);
 
             return key != null && matched.Contains(key);
         }
@@ -571,30 +537,27 @@ namespace GitDiffFolderCreator.Services
         {
             switch (kind)
             {
-                case ChangeFindingKind.ListedTwice:
-                    return 0;
-
-                case ChangeFindingKind.NotCompared:
-                    return 5;
-
-                case ChangeFindingKind.PathMismatch:
-                    return 1;
+case ChangeFindingKind.ListedTwice:
+                return 0;
 
                 case ChangeFindingKind.DocumentedButAbsent:
-                    return 2;
+                    return 1;
 
                 case ChangeFindingKind.DocumentedButUnchanged:
-                    return 3;
+                    return 2;
 
                 case ChangeFindingKind.MissingFromDocument:
+                    return 3;
+
+                case ChangeFindingKind.NotCompared:
                     return 4;
 
                 case ChangeFindingKind.OnlyInBase:
                 case ChangeFindingKind.OnlyInModified:
-                    return 5;
+                    return 4;
 
                 default:
-                    return 6;
+                    return 5;
             }
         }
     }
