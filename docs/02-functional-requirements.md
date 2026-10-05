@@ -101,8 +101,8 @@
 | FR-114 | **Experimental.** A path named in more than one of those sections **MUST NOT** be reported as a duplicate, because a document listing per module is expected to name a shared file more than once — including where two sections spell the same file differently. **MUST** still be reported when the same path appears twice within one section. |
 | FR-92 | **Experimental.** The system **MUST** report every disagreement in both directions: a path listed but not changed, a path changed but not listed, and a path that names no file in either source. |
 | FR-93 | **Experimental.** The system **MUST** treat a moved file as one change at its new path, and **MUST NOT** report it as a deletion and an addition. Listing it at its new path **MUST** count as documented: a change document lists changed files and does not sort them into categories, so the system **MUST NOT** infer one the document never made. |
-| FR-94 | **Experimental.** The system **MUST** state how many files it compared and how many it left out, so that a pass is a statement about the tree rather than an absence of complaints. |
-| FR-95 | **Experimental.** The system **MUST NOT** regard the absence of build output as a difference: these are source trees, and a compiled artifact differs on every build. |
+| FR-94 | **Experimental.** The system **MUST** state how many files it compared, so that a pass is a statement about the tree rather than an absence of complaints. |
+| FR-95 | **Experimental.** The system **MUST NOT** skip any file or folder when comparing the two source trees, and **MUST NOT** offer to: there is no ignore rule for the checker, and therefore no "not compared" answer and no claim the tool declined to examine. A path is answered from the folders themselves, wherever it sits. |
 | FR-40 | A path that Git cannot supply **MUST NOT** discard the rest of the export: one unusable pathname **MUST** affect only itself. |
 | FR-41 | The user **MUST** be able to cancel a running export, and cancellation **MUST** leave no run folder behind. |
 | FR-42 | On completion the system **MUST** report the run folder path, and **MUST** optionally open it in File Explorer. |

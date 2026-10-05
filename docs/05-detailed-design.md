@@ -804,8 +804,9 @@ finding blaming the document for a reader's punctuation:
   `TestAuto Layer/api/app_context.py` whole while stopping at two or more spaces, not at one.
 
 Nothing is excluded on grounds of what it names. A path under `bin` or `obj` is extracted like any
-other, because whether a file counts as build output is a question about the comparison and not about
-what the document said — and the verdict answers it as **Not compared** rather than as missing.
+other, and compared like any other: the two folders here are the two sides of one change, so a file the
+document says changed has to be looked at wherever it lives. There is no **Not compared** answer, because
+there is nothing the check declines to look at.
 
 **Matching a claim to a file.** The claim is read **from the right, on whole folders**: it matches
 when it is the whole of a real path or the tail of one.
@@ -853,18 +854,17 @@ claimed. A move listed at the path it no longer has is reported the same way as 
 there — the listed path is absent, and the file that did change is not listed — which loses nothing the
 reader needs to fix the document and says nothing about intent.
 
-**Build output is skipped by default** (`bin`, `obj`, `.vs`, `.git`, `.svn`, `.hg`, `node_modules`,
-`packages`, `TestResults`). These are source folders, and a compiled assembly differs on every build,
-so including them would drown the real changes. The count is reported either way — files compared and
-files left out — so a pass is a statement about what was examined and never an absence of complaints.
-A claim about a file under a skipped folder is answered as **Not compared** rather than as missing:
-the tool did not look, and saying "no such file" would be a wrong answer to a question it never asked
-(FR-92).
+**Nothing is skipped.** The export's comparer excludes build output by default (`bin`, `obj`, `.vs`,
+`.git` and the rest) because a compiled assembly differs on every build and would drown the real changes.
+The checker passes that list empty and compares everything: its two folders are the two sides of one
+change, and a rule that left out a folder would turn every file in it into a claim the tool never
+examined while the document was describing it as changed. The cost is that a source tree carrying build
+output reports every rebuilt assembly as an undeclared change, which is true and is the reader's cue to
+point at the source rather than the build.
 
-**Findings are ordered by what a reader fixes first**: duplicates, then wrong paths, then claims that
-name nothing, then claims of an edit that is not there, then undeclared changes, then the tidiest.
-Ties break on the path, so the order is the same on every run and two people reading two copies work
-from the same list.
+**Findings are ordered by what a reader fixes first**: duplicates, then claims that name nothing, then
+claims of an edit that is not there, then undeclared changes, then the tidiest. Ties break on the path, so
+the order is the same on every run and two people reading two copies work from the same list.
 
 **Getting the findings out.** `ChangeReportWriter` writes them as CSV or as tab-separated text.
 Quoting follows RFC 4180 — a field holding a comma, a quote or a newline is wrapped and its own

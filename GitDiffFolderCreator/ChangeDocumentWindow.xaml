@@ -12,7 +12,6 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
@@ -122,16 +121,9 @@
             </Grid>
         </Grid>
 
-        <!-- Build output differs on every build, so including it would report every project as changed
-             and bury the changes. Off is the wrong default for a source tree, which is why this is a
-             checkbox the reader can clear rather than a hidden rule. -->
-        <CheckBox Grid.Row="2" Margin="0,10,0,0" VerticalAlignment="Center"
-                  Content="Ignore bin, obj, .vs, .git and similar"
-                  IsChecked="{Binding IgnoreBuildOutput}" />
-
         <!-- The verdict and the findings. Both hidden until there is something to say, so the window
              does not present an empty result as a pass. -->
-        <Border Grid.Row="3" Margin="0,12,0,0" Style="{StaticResource PanelCard}"
+        <Border Grid.Row="2" Margin="0,12,0,0" Style="{StaticResource PanelCard}"
                 Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
             <StackPanel>
                 <TextBlock Style="{StaticResource SectionHeading}" Text="RESULT" />
@@ -154,14 +146,14 @@
             </StackPanel>
         </Border>
 
-        <TextBlock Grid.Row="4" Margin="0,12,0,0" TextWrapping="Wrap"
+        <TextBlock Grid.Row="3" Margin="0,12,0,0" TextWrapping="Wrap"
                    FontSize="12" Foreground="#C62828"
                    Visibility="{Binding HasError, Converter={StaticResource BoolToVisibility}}"
                    Text="{Binding Error}" />
 
         <!-- The findings, one row each. Wrapping rather than trimming because the path is the thing
              being read and a truncated path cannot be checked against a folder. -->
-        <ListView Grid.Row="4" Margin="0,12,0,0"
+        <ListView Grid.Row="3" Margin="0,12,0,0"
                   Background="#FFFFFF"
                   BorderBrush="#D8DCE0" BorderThickness="1"
                   ItemsSource="{Binding Findings}"
@@ -198,7 +190,7 @@
             </ListView.View>
         </ListView>
 
-        <Grid Grid.Row="5" Margin="0,12,0,0">
+        <Grid Grid.Row="4" Margin="0,12,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />

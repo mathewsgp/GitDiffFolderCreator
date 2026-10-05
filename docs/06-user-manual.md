@@ -288,7 +288,6 @@ Press **Verify**. You get a verdict, the counts, and a list of everything the tw
 | Listed, not changed | The document claims an edit that is not there: both sources are identical |
 | Changed, not listed | A real change the document never mentions |
 | Added / Deleted, not listed | A file only in one of the two sources, unmentioned |
-| Not compared | The path is under `bin`, `obj` or similar and the check skipped it |
 
 A moved file is one change under its new path, so listing it there is simply correct. A change document
 lists changed files rather than categories, and nothing here tries to say which sort of change you meant.
@@ -391,12 +390,11 @@ claim names the first of them by name, so the same document and the same tree al
 answer. The other file is then reported as a change the document did not list, which is a statement
 about the document rather than a guess about which file was meant.
 
-**Build output is ignored by default.** `bin`, `obj`, `.vs`, `.git` and the like are skipped,
-because a compiled assembly differs on every build and would drown the real changes. Clear the
-checkbox to include them. A claim about a file under a skipped folder is reported as **Not
-compared** rather than as missing — the tool did not look, and it will not pretend otherwise. The
-line under the verdict always says how many files were compared and how many were left out, so a
-pass is never a claim about more than was examined.
+**Nothing is left out.** `bin`, `obj`, `.git` and the rest are compared like any other folder, because
+the two source trees are the two sides of one change and a file the document says changed has to be
+looked at wherever it lives. A claim about a file in one of those folders is answered from the folders —
+"it is there and unchanged", or "there is no such file" — because the check really did look. If build
+output is getting in the way, the honest fix is to leave it out of the source trees you point at.
 
 **Paths differing only in case are not a mismatch.** Windows cannot hold two such files, so a
 document spelling the path differently is not making a different claim.
@@ -613,12 +611,9 @@ It is looking in the *modified* source folder. A file that exists only in the ba
 deletion rather than an addition, and the document has to describe it as one.
 
 **The checker reports almost every file as changed**
-Build output is being compared. It is excluded by default; if you cleared that box, tick it again.
-The line under the verdict always says how many files were left out.
-
-**A file is reported "Not compared"**
-It sits under `bin`, `obj`, `.git` or similar and the check skipped it on purpose. Tick the ignore
-box off to include it. It is never reported as missing, because the tool did not look for it.
+You are probably pointing it at a folder holding a build. The check compares everything in both trees,
+`bin` and `obj` included, so a compiled assembly that differs on every build comes out as a change
+nobody listed. Point the check at the source only, or delete the build output from the two trees first.
 
 **A real file is reported as "Listed, not present"**
 Check how the document spells it. A path missing its leading folders is fine, but a path that is

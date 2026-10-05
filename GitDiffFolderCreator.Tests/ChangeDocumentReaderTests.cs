@@ -589,8 +589,17 @@ public sealed class ChangeDocumentReaderTests
             && f.ActualPath == "src/Edited.cs");
     }
 
+    /// <summary>
+    /// Nothing is left out of the comparison, whatever folder a file sits in.
+    /// </summary>
+    /// <remarks>
+    /// The export skips build output because a compiled assembly differs on every build and would bury
+    /// the work. The checker cannot: the two folders are the two sides of one change, and a file the
+    /// document says changed has to be looked at wherever it lives — otherwise the check says nothing
+    /// about it and reports agreement.
+    /// </remarks>
     [Fact]
-    public async Task Build_output_is_left_out_unless_the_box_is_asked_to_keep_it()
+    public async Task A_changed_file_is_compared_even_when_it_sits_in_an_ordinary_build_folder()
     {
         using TempDirectory root = new();
         (string baseFolder, string modifiedFolder) = Tree(root);
@@ -598,36 +607,54 @@ public sealed class ChangeDocumentReaderTests
         Write(baseFolder, "bin/App.dll", "old");
         Write(modifiedFolder, "bin/App.dll", "new");
 
-        // With the rule on, the document claims the only real change and the check passes.
-        ChangeDocumentViewModel ignoring = New();
-        ignoring.BaseFolder = baseFolder;
-        ignoring.ModifiedFolder = modifiedFolder;
-        ignoring.DocumentPath = TempDocx.Create(
+        ChangeDocumentViewModel model = New();
+        model.BaseFolder = baseFolder;
+        model.ModifiedFolder = modifiedFolder;
+        model.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
             new[] { "[Modified Files]", Bullet + " src/Edited.cs" });
 
-        Assert.True(ignoring.IgnoreBuildOutput);
+        Write(model.ModifiedFolder, "src/Edited.cs", "after");
+        await model.VerifyAsync();
 
-        Write(ignoring.ModifiedFolder, "src/Edited.cs", "after");
-        await ignoring.VerifyAsync();
+        // The document's own claim is still right, and the compiled output is reported beside it rather
+        // than quietly left out.
+        ChangeFinding finding = Assert.Single(model.Findings);
 
-        Assert.True(ignoring.VerdictIsGood);
-        Assert.Contains("left out", ignoring.DetailLine);
+        Assert.Equal(ChangeFindingKind.MissingFromDocument, finding.Kind);
+        Assert.Equal("bin/App.dll", finding.ActualPath);
+        Assert.DoesNotContain("left out", model.DetailLine);
+    }
 
-        // With it off, the compiled output becomes a change nobody documented - which is exactly why
-        // the rule is on by default.
-        ChangeDocumentViewModel keeping = New();
-        keeping.BaseFolder = baseFolder;
-        keeping.ModifiedFolder = modifiedFolder;
-        keeping.IgnoreBuildOutput = false;
-        keeping.DocumentPath = TempDocx.Create(
+    /// <summary>
+    /// A claim about a file under a build folder is answered from the folders, not excused.
+    /// </summary>
+    /// <remarks>
+    /// There is no longer an ignore rule to defer to, so a document naming a file that is there and
+    /// unchanged gets the same answer as any other: it claims an edit that is not there.
+    /// </remarks>
+    [Fact]
+    public async Task A_claim_about_a_file_in_a_build_folder_is_answered_rather_than_called_missing()
+    {
+        using TempDirectory root = new();
+        (string baseFolder, string modifiedFolder) = Tree(root);
+
+        Write(baseFolder, "bin/App.dll", "same");
+        Write(modifiedFolder, "bin/App.dll", "same");
+
+        ChangeDocumentViewModel model = New();
+        model.BaseFolder = baseFolder;
+        model.ModifiedFolder = modifiedFolder;
+        model.DocumentPath = TempDocx.Create(
             root.PathFor("changes.docx"),
-            new[] { "[Modified Files]", Bullet + " src/Edited.cs" });
+            new[] { "[Modified Files]", Bullet + " bin/App.dll" });
 
-        await keeping.VerifyAsync();
+        await model.VerifyAsync();
 
-        Assert.False(keeping.VerdictIsGood);
-        Assert.Contains(keeping.Findings, f => f.ActualPath == "bin/App.dll");
+        ChangeFinding finding = Assert.Single(model.Findings);
+
+        Assert.Equal(ChangeFindingKind.DocumentedButUnchanged, finding.Kind);
+        Assert.Equal("bin/App.dll", finding.DocumentedPath);
     }
 
     [Fact]

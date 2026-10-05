@@ -268,13 +268,12 @@ So `32fws/wrwe.cs`, `Infrastructure/32fws/wrwe.cs` and the full path all name th
 of them by name, so the answer does not move between runs.
 
 Every disagreement is reported in both directions - a path listed but not changed, a path changed but not
-listed, a path listed twice in one section, a file under a skipped folder (**Not compared**, because the
-tool did not look). A path named in two different sections is not a duplicate: a document listing per
-module is expected to name a shared file more than once. Build output (`bin`, `obj`, `.git`,
-`node_modules` and the like) is ignored by default and the
-verdict always states how many files were compared and how many were left out, so a pass is a statement
-about the tree rather than an absence of complaints. **Copy CSV** and **Export…** take the findings to a
-spreadsheet or a ticket.
+listed, a path listed twice in one section. A path named in two different sections is not a duplicate: a
+document listing per module is expected to name a shared file more than once. The comparison covers
+everything in both trees - `bin`, `obj` and the rest included, because these two folders are the two
+sides of one change and a file the document says changed has to be looked at wherever it lives. The
+verdict always states how many files were compared, so a pass is a statement about the tree rather than
+an absence of complaints. **Copy CSV** and **Export…** take the findings to a spreadsheet or a ticket.
 
 ---
 

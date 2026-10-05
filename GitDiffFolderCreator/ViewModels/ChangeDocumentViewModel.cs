@@ -47,7 +47,6 @@ namespace GitDiffFolderCreator.ViewModels
         private string _baseFolder = string.Empty;
         private string _modifiedFolder = string.Empty;
         private string _documentPath = string.Empty;
-        private bool _ignoreBuildOutput = true;
         private string _changedFilesStartMarker = ChangeDocumentParser.DefaultStartMarker;
         private string _changedFilesEndMarker = ChangeDocumentParser.DefaultEndMarker;
         private string? _error;
@@ -126,20 +125,6 @@ namespace GitDiffFolderCreator.ViewModels
                     RaiseCanVerifyChanged();
                 }
             }
-        }
-
-        /// <summary>
-        /// Whether <c>bin</c>, <c>obj</c> and the rest are left out of the comparison.
-        /// </summary>
-        /// <remarks>
-        /// On by default because these are source trees. A compiled assembly differs on every build, so
-        /// leaving build output in would report every project as changed and bury the changes the check
-        /// exists to find.
-        /// </remarks>
-        public bool IgnoreBuildOutput
-        {
-            get { return _ignoreBuildOutput; }
-            set { SetProperty(ref _ignoreBuildOutput, value); }
         }
 
         /// <summary>
@@ -278,17 +263,10 @@ namespace GitDiffFolderCreator.ViewModels
                     return string.Empty;
                 }
 
-                string compared = string.Format(
+                return string.Format(
                     CultureInfo.CurrentCulture,
                     "{0} file(s) present in both folders were compared.",
                     _result.FilesCompared);
-
-                return _result.FilesIgnored > 0
-                    ? compared + string.Format(
-                        CultureInfo.CurrentCulture,
-                        " {0} file(s) under bin, obj and the like were left out.",
-                        _result.FilesIgnored)
-                    : compared;
             }
         }
 
@@ -535,8 +513,12 @@ namespace GitDiffFolderCreator.ViewModels
                     IList<string> lines = DocxTextReader.ReadLines(documentPath);
                     IList<DocumentedFile> documented = ChangeDocumentParser.Parse(lines, startMarker, endMarker);
 
-                    var comparer = new FolderComparer(
-                        IgnoreBuildOutput ? FolderComparer.DefaultIgnoredFolders : Array.Empty<string>());
+                    // Nothing is left out. The export skips build output because a compiled
+                    // assembly differs on every build and would bury the work; here the two folders are
+                    // the two sides of one change, and a file the document says changed has to be looked
+                    // at whatever folder it sits in - otherwise the check reports nothing about it and
+                    // calls it agreement.
+                    var comparer = new FolderComparer(Array.Empty<string>());
 
                     FolderComparison comparison = comparer.Compare(baseFolder, modifiedFolder);
 

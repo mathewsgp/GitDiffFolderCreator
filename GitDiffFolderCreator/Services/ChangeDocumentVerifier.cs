@@ -26,9 +26,6 @@ namespace GitDiffFolderCreator.Services
 
         /// <summary>The document lists the same path twice.</summary>
         ListedTwice,
-
-        /// <summary>The path is under a folder the comparison was told to skip.</summary>
-        NotCompared,
     }
 
     /// <summary>One disagreement, in a form that can be shown and acted on.</summary>
@@ -84,9 +81,6 @@ namespace GitDiffFolderCreator.Services
 
                 case ChangeFindingKind.ListedTwice:
                     return "Listed twice";
-
-                case ChangeFindingKind.NotCompared:
-                    return "Not compared";
 
                 default:
                     return kind.ToString();
@@ -432,9 +426,8 @@ namespace GitDiffFolderCreator.Services
         }
 
         /// <summary>
-        /// Why a documented path found no difference: it may be identical in both folders, absent from
-        /// the modified one entirely, or sitting under a folder the comparison skipped — and those are
-        /// three different answers.
+        /// Why a documented path found no difference: it may be identical in both folders, or absent from
+        /// the modified one entirely — and those are two different answers.
         /// </summary>
         private ChangeFinding DescribeUnmatchedClaim(DocumentedFile file, FolderComparison comparison)
         {
@@ -449,41 +442,11 @@ namespace GitDiffFolderCreator.Services
                     "The document lists this file as modified, but the two sources hold identical content.");
             }
 
-            if (IsIgnored(file.Path, comparison))
-            {
-                return new ChangeFinding(
-                    ChangeFindingKind.NotCompared,
-                    file.Path,
-                    null,
-                    "This file is under a folder the comparison skipped, so it was not checked. "
-                        + "Clear the ignore rule to include it.");
-            }
-
             return new ChangeFinding(
                 ChangeFindingKind.DocumentedButAbsent,
                 file.Path,
                 null,
                 "The document lists this file, but there is no such file in the modified source.");
-        }
-
-        /// <summary>
-        /// Whether the path sits under a folder this comparison left out.
-        /// </summary>
-        /// <remarks>
-        /// Every segment is checked, not just the first, because the claim may have been written from part
-        /// way down and the skipped folder can be anywhere in it.
-        /// </remarks>
-        private static bool IsIgnored(string path, FolderComparison comparison)
-        {
-            foreach (string segment in path.Split('/'))
-            {
-                if (comparison.IgnoredFolders.Contains(segment))
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         /// <summary>
@@ -548,9 +511,6 @@ case ChangeFindingKind.ListedTwice:
 
                 case ChangeFindingKind.MissingFromDocument:
                     return 3;
-
-                case ChangeFindingKind.NotCompared:
-                    return 4;
 
                 case ChangeFindingKind.OnlyInBase:
                 case ChangeFindingKind.OnlyInModified:

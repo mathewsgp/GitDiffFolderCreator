@@ -63,8 +63,7 @@ namespace GitDiffFolderCreator.Services
             ISet<string> modifiedPaths,
             int filesCompared,
             int filesIgnored,
-            bool ignoredByRule,
-            IEnumerable<string>? ignoredFolders = null)
+            bool ignoredByRule)
         {
             Differences = differences;
             BaseRoot = baseRoot;
@@ -73,22 +72,9 @@ namespace GitDiffFolderCreator.Services
             FilesCompared = filesCompared;
             FilesIgnored = filesIgnored;
             IgnoredByRule = ignoredByRule;
-            IgnoredFolders = new HashSet<string>(
-                ignoredFolders ?? Array.Empty<string>(),
-                StringComparer.OrdinalIgnoreCase);
         }
 
         public IList<FolderDifference> Differences { get; }
-
-        /// <summary>
-        /// The folder names left out of the comparison.
-        /// </summary>
-        /// <remarks>
-        /// Carried so that a documented path sitting under one of them can be answered as "not
-        /// compared" rather than as "no such file". Without it, clearing the ignore rule is the only
-        /// way to find out that the tool never looked.
-        /// </remarks>
-        public ISet<string> IgnoredFolders { get; }
 
         /// <summary>
         /// Every file in the modified folder, whether or not it differs.
@@ -246,12 +232,6 @@ namespace GitDiffFolderCreator.Services
         }
 
         /// <summary>
-        /// The folder names this comparer skips, so a claim about a file under one of them can be
-        /// answered rather than reported as a file that does not exist.
-        /// </summary>
-        internal IReadOnlyCollection<string> IgnoredFolders => _ignoredFolders;
-
-        /// <summary>
         /// Compares the two folders.
         /// </summary>
         /// <exception cref="DirectoryNotFoundException">Either folder does not exist.</exception>
@@ -312,8 +292,7 @@ namespace GitDiffFolderCreator.Services
                 new HashSet<string>(modifiedFiles.Keys, StringComparer.OrdinalIgnoreCase),
                 shared,
                 baseIgnored + modifiedIgnored,
-                baseIgnored + modifiedIgnored > 0,
-                _ignoredFolders);
+                baseIgnored + modifiedIgnored > 0);
         }
 
         /// <summary>Whether two files that both exist hold different content.</summary>

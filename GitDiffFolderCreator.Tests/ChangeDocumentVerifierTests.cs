@@ -631,30 +631,6 @@ public sealed class ChangeDocumentVerifierTests
             finding => finding.Kind == ChangeFindingKind.DocumentedButAbsent);
     }
 
-    [Fact]
-    public void A_file_under_an_ignored_folder_is_answered_rather_than_called_missing()
-    {
-        using TempDirectory root = new();
-        string baseFolder = MakeTree(root, "base");
-        string modifiedFolder = CopyTree(baseFolder, root.PathFor("modified"));
-
-        Write(baseFolder, "bin/App.dll", "before");
-        Write(modifiedFolder, "bin/App.dll", "after");
-
-        FolderComparer comparer = new FolderComparer();
-        FolderComparison comparison = comparer.Compare(baseFolder, modifiedFolder);
-
-        ChangeVerificationResult result = new ChangeDocumentVerifier().Verify(
-            new List<DocumentedFile> { new DocumentedFile("bin/App.dll", 1, "bin/App.dll") },
-            comparison);
-
-        ChangeFinding finding = Assert.Single(result.Findings);
-
-        // The comparison skipped it on purpose. Calling that "no such file" would be a wrong answer
-        // to a question the tool never actually asked.
-        Assert.Equal(ChangeFindingKind.NotCompared, finding.Kind);
-    }
-
     // ------------------------------------------------------------------ helpers
 
     /// <summary>
