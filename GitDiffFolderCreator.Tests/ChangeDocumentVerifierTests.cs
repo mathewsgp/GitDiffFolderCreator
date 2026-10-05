@@ -551,14 +551,16 @@ public sealed class ChangeDocumentVerifierTests
     }
 
     /// <summary>
-    /// Two files ending with the same claim is no answer, so nothing is claimed.
+    /// Two files ending with the same claim is ordinary, and the first by name is taken.
     /// </summary>
     /// <remarks>
-    /// Either file could be meant. Naming one would look identical to a fact in the output, and the
-    /// reader would have no way to tell it was a coin toss.
+    /// Two folders each carrying a copy of the same file is a thing real trees do, and a document listing
+    /// a file once per section repeats the claim for the same reason. Refusing to match would report a
+    /// real change as undocumented, so the claim settles on one file — by name, so that the same document
+    /// and the same tree always give the same answer.
     /// </remarks>
     [Fact]
-    public void A_path_matching_several_files_is_left_unresolved_rather_than_guessed()
+    public void A_path_matching_several_files_is_resolved_to_the_first_by_name()
     {
         using TempDirectory root = new();
         (string baseFolder, string modifiedFolder) = MakePair(root);
@@ -568,19 +570,20 @@ public sealed class ChangeDocumentVerifierTests
         Write(baseFolder, "new/api/Reader.py", "two before");
         Write(modifiedFolder, "new/api/Reader.py", "two after");
 
-        // "api/Reader.py" is the tail of both, so it names two files and therefore none.
+        // "api/Reader.py" is the tail of both, and both really did change, so the claim is a match
+        // rather than a report about a file nobody listed.
         ChangeVerificationResult result = Verify(baseFolder, modifiedFolder, "api/Reader.py");
 
-        Assert.Equal(0, result.Matches);
-        Assert.Single(result.Findings, f => f.Kind == ChangeFindingKind.DocumentedButAbsent);
-        Assert.Equal(2, result.Findings.Count(f => f.Kind == ChangeFindingKind.MissingFromDocument));
+        Assert.Equal(1, result.Matches);
+        Assert.DoesNotContain(result.Findings, f => f.Kind == ChangeFindingKind.DocumentedButAbsent);
 
-        // A claim that does settle it still matches: refusing to guess is not refusing to match. What is
-        // left is the other file, which this document did not list - a true omission, not a guess.
-        ChangeVerificationResult exact = Verify(baseFolder, modifiedFolder, "old/api/Reader.py");
+        // Which file it settled on is visible in what is left: the claim took new/api/Reader.py, the
+        // first by name, so old/api/Reader.py is the one this document did not list - a statement about
+        // the document rather than a guess about which file was meant.
+        ChangeFinding other = Assert.Single(result.Findings);
 
-        Assert.Equal(1, exact.Matches);
-        Assert.Single(exact.Findings, f => f.Kind == ChangeFindingKind.MissingFromDocument);
+        Assert.Equal(ChangeFindingKind.MissingFromDocument, other.Kind);
+        Assert.Equal("old/api/Reader.py", other.ActualPath);
     }
 
     /// <summary>

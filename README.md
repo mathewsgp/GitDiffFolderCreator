@@ -264,8 +264,8 @@ Both sides of a comparison are normalised the same way: separators unified to `/
 whitespace and slashes trimmed, a leading `./` dropped. Matching then reads each claim **from the
 right**, on whole folders, and a claim matches when it is the whole of a real path or the tail of one.
 So `32fws/wrwe.cs`, `Infrastructure/32fws/wrwe.cs` and the full path all name the same file, while
-`eReader.cs` does not match `LegacyReader.cs` and a tail two different files could answer is reported as
-naming nothing rather than guessed at.
+`eReader.cs` does not match `LegacyReader.cs`. A tail two different files could answer takes the first
+of them by name, so the answer does not move between runs.
 
 Every disagreement is reported in both directions - a path listed but not changed, a path changed but not
 listed, a path listed twice in one section, a file under a skipped folder (**Not compared**, because the

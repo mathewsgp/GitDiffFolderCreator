@@ -410,9 +410,10 @@ namespace GitDiffFolderCreator.Services
         /// leading <c>\</c> is not a folder the source has to have.
         /// </para>
         /// <para>
-        /// Two files ending with the same claim is no answer at all: naming either would put a guess in
-        /// the output where a fact belongs, and the reader would have no way to tell. It is left
-        /// unresolved, and reported as a claim that names nothing.
+        /// Several files can end with the same claim, and that is ordinary: two folders in the tree each
+        /// carrying a copy of <c>api/Reader.py</c>, or a document listing one file once per section. The
+        /// first by name is taken. An answer that moved about with the order the walk happened to reach
+        /// files in would read as a change in the verdict rather than as a tie-break.
         /// </para>
         /// </remarks>
         private static string? Resolve(string claim, IEnumerable<string> actual)
@@ -433,12 +434,10 @@ namespace GitDiffFolderCreator.Services
                     continue;
                 }
 
-                if (hit != null)
+                if (hit == null || string.Compare(path, hit, StringComparison.OrdinalIgnoreCase) < 0)
                 {
-                    return null;
+                    hit = path;
                 }
-
-                hit = path;
             }
 
             return hit;

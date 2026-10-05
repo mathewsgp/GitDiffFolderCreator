@@ -382,8 +382,10 @@ counts as a match when it is the whole of a real path or the tail of one. So all
 | `32fws/wrwe.cs` | written from the folder down |
 
 The tail has to land on a folder boundary, so `eReader.cs` does **not** match `LegacyReader.cs`. If two
-different files end with the same path, the checker names neither and reports the claim as not present,
-rather than picking one for you.
+different files end with the same path — two folders each carrying a copy, which real trees do — the
+claim names the first of them by name, so the same document and the same tree always give the same
+answer. The other file is then reported as a change the document did not list, which is a statement
+about the document rather than a guess about which file was meant.
 
 **Build output is ignored by default.** `bin`, `obj`, `.vs`, `.git` and the like are skipped,
 because a compiled assembly differs on every build and would drown the real changes. Clear the

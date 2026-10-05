@@ -815,7 +815,7 @@ when it is the whole of a real path or the tail of one.
 Src/Module1/View2/Frames/wrwe.cs   matches Src/Module1/View2/Frames/wrwe.cs   (the whole thing)
 Module1/View2/Frames/wrwe.cs       matches the same file                       (a tail of it)
 Frames/wrwe.cs                     matches the same file                       (a shorter tail)
-32fws/wrwe.cs                      names two files, or none                    (a suffix must land on a separator)
+32fws/wrwe.cs                      matches nothing at all                      (a suffix must land on a separator)
 ```
 
 Comparing on whole folders rather than on characters is what keeps `eReader.cs` from matching
@@ -824,9 +824,12 @@ written from part way down the tree without every such path being called missing
 wrote fewer folders than it meant to has not made a false claim about anything, so it is a match and
 nothing is reported — which is why there is no partial-match finding.
 
-Two files ending with the same claim is **no answer at all**: naming either would put a guess in the
-output where a fact belongs, and the reader would have no way to tell. It is left unresolved, and the
-claim is reported as not present.
+Two files ending with the same claim is ordinary rather than a puzzle: two folders in the tree each
+carry a copy of `api/Reader.py`, and a document listing one file once per section repeats the claim for
+the same reason. The claim settles on **the first by name**, which keeps the answer independent of the
+order the folder walk happened to reach files in — an answer that moved between runs would read as a
+change in the verdict rather than as a tie-break. The file not settled on is then left to its own
+account, and shows up as a change the document did not list.
 
 The result is that the extractor needs no knowledge of the folders and the verifier no knowledge of
 the prose. Neither has to be trusted about the other's half of the problem, and neither needs a rule
